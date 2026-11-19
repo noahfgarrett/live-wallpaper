@@ -1,5 +1,6 @@
 using System.Drawing;
 using LiveWallpaper.Media;
+using Vortice.WIC;
 
 namespace LiveWallpaper.Windows.Tests;
 
@@ -84,5 +85,70 @@ public sealed class WicImageLoaderTests : IDisposable
         File.WriteAllText(path, "this is not a picture");
 
         Assert.Throws<ImageLoadException>(() => WicImageLoader.Load(path, new Size(4, 4)));
+    }
+
+    private string Halves(ContainerFormat format, string extension, ushort? orientation = null)
+    {
+        var path = TestImages.TempFile(extension);
+        _files.Add(path);
+        TestImages.WriteHalves(path, 16, 8, format, orientation);
+        return path;
+    }
+
+    private static (byte B, byte G, byte R) PixelAt(DecodedImage image, int x, int y)
+    {
+        var i = (y * image.Stride) + (x * 4);
+        return (image.Pixels[i], image.Pixels[i + 1], image.Pixels[i + 2]);
+    }
+
+    [Fact]
+    public void Load_WithSourceCrop_ReturnsOnlyThatRegion()
+    {
+        WindowsOnly.Require();
+
+        var image = WicImageLoader.Load(Halves(ContainerFormat.Png, ".png"), new Rectangle(8, 0, 8, 8), new Size(8, 8));
+
+        Assert.Equal((255, 0, 0), PixelAt(image, 0, 0));
+        Assert.Equal((255, 0, 0), PixelAt(image, 7, 7));
+    }
+
+    [Fact]
+    public void ReadSize_ExifRotated90_SwapsDimensions()
+    {
+        WindowsOnly.Require();
+
+        Assert.Equal(new Size(8, 16), WicImageLoader.ReadSize(Halves(ContainerFormat.Jpeg, ".jpg", orientation: 6)));
+    }
+
+    [Fact]
+    public void Load_ExifRotated90_PutsTheLeftHalfOnTop()
+    {
+        WindowsOnly.Require();
+
+        var image = WicImageLoader.Load(Halves(ContainerFormat.Jpeg, ".jpg", orientation: 6), new Size(8, 16));
+
+        var top = PixelAt(image, 4, 2);
+        var bottom = PixelAt(image, 4, 13);
+        Assert.True(top.R > 200 && top.B < 60, $"top pixel was {top}");
+        Assert.True(bottom.B > 200 && bottom.R < 60, $"bottom pixel was {bottom}");
+    }
+
+    [Fact]
+    public void Load_ExifRotated180_SwapsLeftAndRight()
+    {
+        WindowsOnly.Require();
+
+        var image = WicImageLoader.Load(Halves(ContainerFormat.Jpeg, ".jpg", orientation: 3), new Size(16, 8));
+
+        var left = PixelAt(image, 2, 4);
+        Assert.True(left.B > 200 && left.R < 60, $"left pixel was {left}");
+    }
+
+    [Fact]
+    public void ReadSize_JpegWithoutOrientation_KeepsDimensions()
+    {
+        WindowsOnly.Require();
+
+        Assert.Equal(new Size(16, 8), WicImageLoader.ReadSize(Halves(ContainerFormat.Jpeg, ".jpg")));
     }
 }
