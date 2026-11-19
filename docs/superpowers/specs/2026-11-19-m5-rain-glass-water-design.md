@@ -143,7 +143,7 @@ Changes:
   - Each pixel holds the flow vector of the region covering it, already converted to target pixels per cycle; the last region wins where regions overlap.
   - It is rebuilt alongside the water mask. The mask provides the soft edge; the flow field is unblurred.
   - `RegionMask`'s polygon fill is reused, with no new rasterizer.
-- `ActiveParticles` counts rain streaks plus glass drops plus snow flakes. Water reports 0.
+- `ActiveParticles` counts rain streaks plus snow flakes. Glass drops are per-pixel, not instances, and Water has no particles; both report 0.
 - `IsAnimated` is true when any enabled effect is animated. Water counts only when it has regions; Glass counts when it is enabled.
 
 ### 5.4 Rain
