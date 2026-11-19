@@ -330,6 +330,18 @@ public sealed class LibraryStoreTests : IDisposable
     }
 
     [Fact]
+    public void WaterSettings_MissingMist_LoadsAs40()
+    {
+        WriteLibrary(M4Item.Replace(
+            "\"regions\": {",
+            "\"water\": { \"settings\": { \"enabled\": true, \"stretchPct\": 50, \"foamPct\": 30 }, \"regions\": { \"regions\": [], \"invert\": false, \"featherPct\": 1 } }, \"regions\": {"));
+
+        var item = Assert.Single(_store.Load());
+
+        Assert.Equal(40, item.Water.Settings.MistPct);
+    }
+
+    [Fact]
     public void Load_WaterRegionWithoutFlow_GetsDefaultArrow()
     {
         WriteLibrary(M4Item.Replace(
