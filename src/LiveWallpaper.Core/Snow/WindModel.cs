@@ -2,17 +2,24 @@ namespace LiveWallpaper.Core.Snow;
 
 public sealed class WindModel
 {
-    private const double BaseWindPxPerSec = 120;
+    private const double DefaultBaseWindPxPerSec = 120;
     private const double GustStrength = 0.8;
     private static readonly double[] s_frequenciesHz = [0.071, 0.113, 0.029];
     private static readonly double[] s_weights = [1, 0.6, 0.4];
 
+    private readonly double _baseWindPxPerSecAtFull;
     private readonly double[] _phases = new double[3];
     private double _time;
     private double _offsetPx;
 
     public WindModel(uint seed)
+        : this(seed, DefaultBaseWindPxPerSec)
     {
+    }
+
+    public WindModel(uint seed, double basePxPerSecAtFull)
+    {
+        _baseWindPxPerSecAtFull = basePxPerSecAtFull;
         var state = seed;
         for (var i = 0; i < _phases.Length; i++)
         {
@@ -24,7 +31,7 @@ public sealed class WindModel
     {
         var dt = Math.Max(0, dtSec);
         _time += dt;
-        var baseWind = BaseWindPxPerSec * (SnowModel.ClampPct(windPct) / 100) * (heightPx / SnowModel.ReferenceHeightPx);
+        var baseWind = _baseWindPxPerSecAtFull * (SnowModel.ClampPct(windPct) / 100) * (heightPx / SnowModel.ReferenceHeightPx);
         var g = 0.0;
         for (var i = 0; i < s_frequenciesHz.Length; i++)
         {
