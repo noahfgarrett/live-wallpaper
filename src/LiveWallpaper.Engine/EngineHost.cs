@@ -28,6 +28,10 @@ public sealed class EngineHost
     private const double PowerCheckIntervalSeconds = 2;
     private const int RecentItemCount = 8;
 
+    private static readonly TimeSpan TakeoverConnectTimeout = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan TakeoverAnswerGrace = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan TakeoverCloseTimeout = TimeSpan.FromSeconds(5);
+
     private readonly GpuDevice _gpu;
     private readonly ImageQuadRenderer _background;
     private readonly SettingsStore _store = new(AppPaths.SettingsFile, TimeProvider.System);
@@ -60,10 +64,9 @@ public sealed class EngineHost
 
     public static int Run()
     {
-        using var instance = SingleInstance.TryAcquire(SingleInstance.EngineMutexName);
+        using var instance = EngineTakeover.TryTakeOver(SingleInstance.EngineMutexName, CurrentEngineAnswers, TakeoverAnswerGrace, TakeoverCloseTimeout, EngineTakeover.StopOtherEngines);
         if (instance is null)
         {
-            Log.Info("engine", "event=already-running");
             return 0;
         }
 
@@ -116,6 +119,10 @@ public sealed class EngineHost
         Log.Info("engine", $"event=stop exitCode={exitCode}");
         return exitCode;
     }
+
+    /// <summary>True when the engine holding the mutex is a current one with a working pipe.</summary>
+    private static bool CurrentEngineAnswers() =>
+        new EngineClient(EnginePipe.Name).SendAsync(new GetStatus(), TakeoverConnectTimeout, CancellationToken.None).GetAwaiter().GetResult() is StatusReport;
 
     private static GpuDevice CreateGpu()
     {

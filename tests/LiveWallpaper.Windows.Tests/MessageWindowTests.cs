@@ -1,5 +1,6 @@
 namespace LiveWallpaper.Windows.Tests;
 
+[Collection(MessageWindowCollection.Name)]
 public sealed class MessageWindowTests
 {
     [Fact]
