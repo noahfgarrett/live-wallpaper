@@ -23,6 +23,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     private EditorView? _editor;
     private int _missedStatus;
     private bool _refreshing;
+    private EngineStart _lastStart = EngineStart.Running;
 
     public MainWindow(EngineConnection engine, AppPage startPage)
     {
@@ -40,8 +41,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         _statusTimer.Tick += async (_, _) => await RefreshEngineStatusAsync();
         Loaded += async (_, _) =>
         {
-            await _engine.EnsureRunningAsync(CancellationToken.None);
-            await RefreshEngineStatusAsync();
+            await StartEngineAsync();
             _statusTimer.Start();
         };
     }
@@ -49,6 +49,14 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     public EngineStatus? LastStatus { get; private set; }
 
     public event EventHandler<EngineStatus?>? StatusChanged;
+
+    /// <summary>Starts the engine if it isn't answering, and remembers why it couldn't be started for the status line.</summary>
+    public async Task<EngineStart> StartEngineAsync()
+    {
+        _lastStart = await _engine.EnsureRunningAsync(CancellationToken.None);
+        await RefreshEngineStatusAsync();
+        return _lastStart;
+    }
 
     public async Task RefreshEngineStatusAsync()
     {
@@ -74,7 +82,9 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         if (LastStatus is null)
         {
             EngineDot.Fill = StoppedBrush;
-            EngineText.Text = "The wallpaper engine isn't running";
+            EngineText.Text = _lastStart == EngineStart.OlderEngineInTheWay
+                ? EngineConnection.Describe(_lastStart)
+                : "The wallpaper engine isn't running";
         }
         else
         {

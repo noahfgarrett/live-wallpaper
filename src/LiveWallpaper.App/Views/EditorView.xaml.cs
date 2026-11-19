@@ -297,9 +297,10 @@ public partial class EditorView : UserControl
         Overlay.Visibility = Visibility.Visible;
         ApplyPanel.Open(_item, SelectedScaling(), async (selector, scaling) =>
         {
-            if (!await _engine.EnsureRunningAsync(CancellationToken.None))
+            var start = await _engine.EnsureRunningAsync(CancellationToken.None);
+            if (start != EngineStart.Running)
             {
-                return "The wallpaper engine couldn't be started.";
+                return EngineConnection.Describe(start);
             }
             var response = await _engine.SendAsync(new ApplyWallpaper(_item.Id, selector, scaling), CancellationToken.None);
             if (response is Failed failed)

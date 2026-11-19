@@ -163,9 +163,10 @@ public partial class LibraryView : UserControl
         Overlay.Visibility = Visibility.Visible;
         ApplyPanel.Open(item, _window.LastStatus?.Settings.DefaultScaling ?? WallpaperScaling.Fill, async (selector, scaling) =>
         {
-            if (!await _engine.EnsureRunningAsync(CancellationToken.None))
+            var start = await _engine.EnsureRunningAsync(CancellationToken.None);
+            if (start != EngineStart.Running)
             {
-                return "The wallpaper engine couldn't be started.";
+                return EngineConnection.Describe(start);
             }
             var response = await _engine.SendAsync(new ApplyWallpaper(item.Id, selector, scaling), CancellationToken.None);
             if (response is Failed failed)
@@ -184,8 +185,11 @@ public partial class LibraryView : UserControl
 
     private async void OnStartEngine(object sender, RoutedEventArgs e)
     {
-        await _engine.EnsureRunningAsync(CancellationToken.None);
-        await _window.RefreshEngineStatusAsync();
+        var start = await _window.StartEngineAsync();
+        if (start != EngineStart.Running)
+        {
+            ShowMessage(InfoBarSeverity.Error, "Couldn't start the engine", EngineConnection.Describe(start));
+        }
     }
 
     private void CloseOverlay()
