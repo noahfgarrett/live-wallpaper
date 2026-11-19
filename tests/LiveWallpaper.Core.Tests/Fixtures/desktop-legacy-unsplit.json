@@ -1,0 +1,7 @@
+{
+    "osVersion": "10.0.22631",
+    "windows": [
+        { "handle": 3001, "className": "Progman", "parentHandle": 0, "zOrder": 42, "isVisible": true, "exStyle": 128, "x": 0, "y": 0, "width": 1920, "height": 1080 },
+        { "handle": 3002, "className": "SHELLDLL_DefView", "parentHandle": 3001, "zOrder": 0, "isVisible": true, "exStyle": 0, "x": 0, "y": 0, "width": 1920, "height": 1080 }
+    ]
+}

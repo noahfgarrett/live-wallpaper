@@ -1,0 +1,7 @@
+{
+    "osVersion": "10.0.26100",
+    "windows": [
+        { "handle": 3001, "className": "Progman", "parentHandle": 0, "zOrder": 42, "isVisible": true, "exStyle": 128, "x": 0, "y": 0, "width": 1920, "height": 1080 },
+        { "handle": 2001, "className": "WorkerW", "parentHandle": 0, "zOrder": 43, "isVisible": true, "exStyle": 128, "x": 0, "y": 0, "width": 1920, "height": 1080 }
+    ]
+}
