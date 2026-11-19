@@ -145,7 +145,7 @@ public sealed class PreviewRenderer : IDisposable
                     if (scene is not null && snow is not null)
                     {
                         snow.Apply(Volatile.Read(ref _snow));
-                        scene.SetRegions(Volatile.Read(ref _regions));
+                        scene.SetRegions(EffectKind.Snow, Volatile.Read(ref _regions));
                         scene.Update(new FrameTime(dt, now), size);
                         scene.Render(surface.BackBuffer, size);
                         var frame = Volatile.Read(ref _overlay);

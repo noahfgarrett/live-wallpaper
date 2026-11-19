@@ -256,7 +256,7 @@ public sealed class EngineHost
                 }
                 foreach (var wallpaper in _wallpapers.Where(w => w.ItemId == update.LibraryItemId))
                 {
-                    wallpaper.Scene.SetRegions(update.Regions);
+                    wallpaper.Scene.SetRegions(EffectKind.Snow, update.Regions);
                 }
                 _needsPresent = true;
                 return new Ok();
@@ -540,7 +540,7 @@ public sealed class EngineHost
             var snow = new SnowEffect(_gpu, Seed(image.Monitor.Id));
             scene.Effects.Add(snow);
             snow.Apply(image.Item.Snow);
-            scene.SetRegions(image.Item.Regions);
+            scene.SetRegions(EffectKind.Snow, image.Item.Regions);
 
             window = WallpaperWindow.Create();
             DesktopHost.Attach(window.Handle, _plan, image.Monitor.Bounds);

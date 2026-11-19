@@ -84,7 +84,7 @@ public sealed class MaskedSnowTests
         WindowsOnly.Require();
         var background = Render(null);
 
-        var pixels = Render(HeavySnow, scene => scene.SetRegions(Half(right: true)));
+        var pixels = Render(HeavySnow, scene => scene.SetRegions(EffectKind.Snow, Half(right: true)));
 
         Assert.Equal(0, Brightened(pixels, background, 0, 958));
         Assert.True(Brightened(pixels, background, 962, Target.Width) >= 1000);
@@ -96,7 +96,7 @@ public sealed class MaskedSnowTests
         WindowsOnly.Require();
         var background = Render(null);
 
-        var pixels = Render(HeavySnow, scene => scene.SetRegions(Half(right: true, invert: true)));
+        var pixels = Render(HeavySnow, scene => scene.SetRegions(EffectKind.Snow, Half(right: true, invert: true)));
 
         Assert.True(Brightened(pixels, background, 0, 958) >= 1000);
         Assert.Equal(0, Brightened(pixels, background, 962, Target.Width));
@@ -114,14 +114,14 @@ public sealed class MaskedSnowTests
         var effect = new SnowEffect(gpu, 7);
         effect.Apply(HeavySnow);
         scene.Effects.Add(effect);
-        scene.SetRegions(Half(right: true));
+        scene.SetRegions(EffectKind.Snow, Half(right: true));
         for (var i = 1; i <= Frames; i++)
         {
             scene.Update(new FrameTime(1.0 / 60, i / 60.0), Target);
         }
         scene.Render(target.View, Target);
 
-        scene.SetRegions(Half(right: false));
+        scene.SetRegions(EffectKind.Snow, Half(right: false));
         scene.Update(new FrameTime(1.0 / 60, (Frames + 1) / 60.0), Target);
         scene.Render(target.View, Target);
         var pixels = target.ReadBack();
@@ -135,6 +135,6 @@ public sealed class MaskedSnowTests
     {
         WindowsOnly.Require();
 
-        Assert.Equal(Render(HeavySnow), Render(HeavySnow, scene => scene.SetRegions(RegionSet.Empty)));
+        Assert.Equal(Render(HeavySnow), Render(HeavySnow, scene => scene.SetRegions(EffectKind.Snow, RegionSet.Empty)));
     }
 }

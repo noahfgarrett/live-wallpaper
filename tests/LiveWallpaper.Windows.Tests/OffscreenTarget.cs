@@ -26,11 +26,21 @@ internal sealed unsafe class OffscreenTarget : IDisposable
 
     public ID3D11RenderTargetView View { get; }
 
-    public byte[] ReadBack()
+    public byte[] ReadBack() => ReadMip0(_texture);
+
+    /// <summary>Reads mip 0 of the texture behind <paramref name="view"/>, which must be target-sized B8G8R8A8.</summary>
+    public byte[] ReadBack(ID3D11ShaderResourceView view)
+    {
+        using var resource = view.Resource;
+        using var texture = resource.QueryInterface<ID3D11Texture2D>();
+        return ReadMip0(texture);
+    }
+
+    private byte[] ReadMip0(ID3D11Texture2D source)
     {
         var stagingDesc = _desc with { BindFlags = BindFlags.None, Usage = ResourceUsage.Staging, CPUAccessFlags = CpuAccessFlags.Read };
         using var staging = _gpu.Device.CreateTexture2D(stagingDesc);
-        _gpu.Context.CopyResource(staging, _texture);
+        _gpu.Context.CopySubresourceRegion(staging, 0, 0, 0, 0, source, 0);
         var mapped = _gpu.Context.Map(staging, 0, MapMode.Read);
         try
         {
