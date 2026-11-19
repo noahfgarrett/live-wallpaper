@@ -355,7 +355,7 @@ public sealed class LibraryStoreTests : IDisposable
     }
 
     [Fact]
-    public void Load_NaNRainDensity_IsTreatedAsCorrupt()
+    public void Load_NaNRainDensityString_FailsJsonParsingAndIsTreatedAsCorrupt()
     {
         WriteLibrary(M4Item.Replace(
             "\"regions\": {",
@@ -363,4 +363,27 @@ public sealed class LibraryStoreTests : IDisposable
 
         Assert.Empty(_store.Load());
     }
+
+    private void AssertCorrupt(string insertedSlot)
+    {
+        WriteLibrary(M4Item.Replace("\"regions\": {", insertedSlot));
+
+        Assert.Empty(_store.Load());
+    }
+
+    [Fact]
+    public void Load_RainDensityOver100_IsTreatedAsCorrupt() =>
+        AssertCorrupt("\"rain\": { \"settings\": { \"enabled\": true, \"densityPct\": 150, \"speedPct\": 50, \"windPct\": 20, \"lengthPct\": 50, \"brightnessPct\": 50 }, \"regions\": { \"regions\": [], \"invert\": false, \"featherPct\": 1 } }, \"regions\": {");
+
+    [Fact]
+    public void Load_GlassPointOutsideImage_IsTreatedAsCorrupt() =>
+        AssertCorrupt("\"glass\": { \"settings\": { \"enabled\": true, \"dropsPct\": 50, \"dropSizePct\": 50, \"slidingPct\": 40, \"fogPct\": 30 }, \"regions\": { \"regions\": [ { \"points\": [ { \"x\": 0.1, \"y\": 0.1 }, { \"x\": 1.5, \"y\": 0.1 }, { \"x\": 0.5, \"y\": 0.5 }, { \"x\": 0.1, \"y\": 0.5 } ] } ], \"invert\": false, \"featherPct\": 1 } }, \"regions\": {");
+
+    [Fact]
+    public void Load_GlassRegionWithFivePointsOutsideImage_IsTreatedAsCorrupt() =>
+        AssertCorrupt("\"glass\": { \"settings\": { \"enabled\": true, \"dropsPct\": 50, \"dropSizePct\": 50, \"slidingPct\": 40, \"fogPct\": 30 }, \"regions\": { \"regions\": [ { \"points\": [ { \"x\": 0.1, \"y\": 0.1 }, { \"x\": 0.5, \"y\": 0.1 }, { \"x\": 0.6, \"y\": 0.3 }, { \"x\": 0.5, \"y\": 0.5 }, { \"x\": 1.5, \"y\": 0.5 } ] } ], \"invert\": false, \"featherPct\": 1 } }, \"regions\": {");
+
+    [Fact]
+    public void Load_WaterFlowLongerThanOne_IsTreatedAsCorrupt() =>
+        AssertCorrupt("\"water\": { \"settings\": { \"enabled\": true, \"stretchPct\": 50, \"foamPct\": 30 }, \"regions\": { \"regions\": [ { \"points\": [ { \"x\": 0.1, \"y\": 0.1 }, { \"x\": 0.5, \"y\": 0.1 }, { \"x\": 0.3, \"y\": 0.5 } ], \"flow\": { \"x\": 5, \"y\": 0 } } ], \"invert\": false, \"featherPct\": 1 } }, \"regions\": {");
 }

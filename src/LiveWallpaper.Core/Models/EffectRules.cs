@@ -10,13 +10,12 @@ public static class EffectRules
 
     public static readonly RegionPoint DefaultFlow = new(0, 0.12);
 
-    /// <summary>Makes a loaded region set obey the effect's shape rules. Snow and rain are returned unchanged.</summary>
+    /// <summary>
+    /// Makes a loaded region set obey the effect's shape rules: glass loses non-quads, water gets the default arrow where it has none.
+    /// Snow and rain are returned unchanged. Call it on a set that already passed <see cref="RegionSet.IsValid"/>.
+    /// </summary>
     public static RegionSet Repair(EffectKind kind, RegionSet set)
     {
-        if (set?.Regions is null)
-        {
-            return set!;
-        }
         switch (kind)
         {
             case EffectKind.Snow:
@@ -26,7 +25,7 @@ public static class EffectRules
                 return set with
                 {
                     Invert = false,
-                    Regions = set.Regions.Where(r => r is not null && r.Points?.Count == GlassPanePoints).ToArray(),
+                    Regions = set.Regions.Where(r => r.Points.Count == GlassPanePoints).ToArray(),
                 };
             case EffectKind.Water:
                 return set with
@@ -59,8 +58,7 @@ public static class EffectRules
         }
     }
 
-    private static Region WithFlow(Region region) =>
-        region is null || IsValidFlow(region.Flow) ? region! : region with { Flow = DefaultFlow };
+    private static Region WithFlow(Region region) => region.Flow is null ? region with { Flow = DefaultFlow } : region;
 
     public static bool IsValidFlow(RegionPoint? flow)
     {
