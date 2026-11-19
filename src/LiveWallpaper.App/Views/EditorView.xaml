@@ -5,9 +5,68 @@
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     xmlns:preview="clr-namespace:LiveWallpaper.App.Preview"
     xmlns:views="clr-namespace:LiveWallpaper.App.Views"
+    xmlns:models="clr-namespace:LiveWallpaper.Core.Models;assembly=LiveWallpaper.Core"
     Focusable="True"
     FocusVisualStyle="{x:Null}"
     PreviewKeyDown="OnPreviewKeyDown">
+    <UserControl.Resources>
+        <Style x:Key="EffectTabFocus">
+            <Setter Property="Control.Template">
+                <Setter.Value>
+                    <ControlTemplate>
+                        <Border BorderBrush="{DynamicResource FocusStrokeColorOuterBrush}" BorderThickness="2" CornerRadius="13" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="EffectTab" TargetType="RadioButton">
+            <Setter Property="GroupName" Value="EffectTabs" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource EffectTabFocus}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border
+                            x:Name="Pill"
+                            Padding="0,7,0,6"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="Transparent"
+                            BorderThickness="1"
+                            CornerRadius="13">
+                            <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Pill" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Pill" Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
+                                <Setter TargetName="Pill" Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="TabLabel" TargetType="TextBlock">
+            <Setter Property="Margin" Value="0,3,0,0" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+        <Style x:Key="TabDot" TargetType="Ellipse">
+            <Setter Property="Width" Value="6" />
+            <Setter Property="Height" Value="6" />
+            <Setter Property="Margin" Value="0,-1,-7,0" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="Fill" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+            <Setter Property="Visibility" Value="Collapsed" />
+        </Style>
+    </UserControl.Resources>
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
@@ -32,43 +91,134 @@
 
         <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="0,4,4,16">
-                <DockPanel Margin="0,0,0,4">
-                    <ui:ToggleSwitch x:Name="SnowEnabled" DockPanel.Dock="Right" Checked="OnSnowChanged" Unchecked="OnSnowChanged" />
-                    <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="WeatherSnow24" Margin="0,0,8,0" />
+                <Border
+                    Padding="3"
+                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="16">
+                    <UniformGrid Columns="4">
+                        <RadioButton x:Name="SnowTab" Checked="OnTabChecked" IsChecked="True" Style="{StaticResource EffectTab}" Tag="{x:Static models:EffectKind.Snow}" AutomationProperties.Name="Snow">
+                            <StackPanel>
+                                <Grid HorizontalAlignment="Center">
+                                    <ui:SymbolIcon FontSize="18" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Symbol="WeatherSnow24" />
+                                    <Ellipse x:Name="SnowDot" Style="{StaticResource TabDot}" />
+                                </Grid>
+                                <TextBlock Style="{StaticResource TabLabel}" Text="Snow" />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton x:Name="RainTab" Checked="OnTabChecked" Style="{StaticResource EffectTab}" Tag="{x:Static models:EffectKind.Rain}" AutomationProperties.Name="Rain">
+                            <StackPanel>
+                                <Grid HorizontalAlignment="Center">
+                                    <ui:SymbolIcon FontSize="18" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Symbol="WeatherRain24" />
+                                    <Ellipse x:Name="RainDot" Style="{StaticResource TabDot}" />
+                                </Grid>
+                                <TextBlock Style="{StaticResource TabLabel}" Text="Rain" />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton x:Name="GlassTab" Checked="OnTabChecked" Style="{StaticResource EffectTab}" Tag="{x:Static models:EffectKind.Glass}" AutomationProperties.Name="Glass">
+                            <StackPanel>
+                                <Grid HorizontalAlignment="Center">
+                                    <ui:SymbolIcon FontSize="18" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Symbol="Window24" />
+                                    <Ellipse x:Name="GlassDot" Style="{StaticResource TabDot}" />
+                                </Grid>
+                                <TextBlock Style="{StaticResource TabLabel}" Text="Glass" />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton x:Name="WaterTab" Checked="OnTabChecked" Style="{StaticResource EffectTab}" Tag="{x:Static models:EffectKind.Water}" AutomationProperties.Name="Water">
+                            <StackPanel>
+                                <Grid HorizontalAlignment="Center">
+                                    <ui:SymbolIcon FontSize="18" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Symbol="Drop24" />
+                                    <Ellipse x:Name="WaterDot" Style="{StaticResource TabDot}" />
+                                </Grid>
+                                <TextBlock Style="{StaticResource TabLabel}" Text="Water" />
+                            </StackPanel>
+                        </RadioButton>
+                    </UniformGrid>
+                </Border>
+
+                <StackPanel x:Name="SnowPanel" Margin="0,20,0,0">
+                    <DockPanel Margin="0,0,0,4">
+                        <ui:ToggleSwitch x:Name="SnowEnabled" DockPanel.Dock="Right" Checked="OnSnowChanged" Unchecked="OnSnowChanged" />
                         <ui:TextBlock VerticalAlignment="Center" FontTypography="Subtitle" Text="Snow" />
-                    </StackPanel>
-                </DockPanel>
-                <TextBlock Style="{StaticResource HelpText}" Text="Changes show in the preview right away, and on your desktop too if this image is applied." />
+                    </DockPanel>
+                    <TextBlock Style="{StaticResource HelpText}" Text="Changes show in the preview right away, and on your desktop too if this image is applied." />
+                    <DockPanel Margin="0,20,0,4"><TextBlock x:Name="SnowDensityValue" DockPanel.Dock="Right" Style="{StaticResource HelpText}" /><TextBlock Text="Density" /></DockPanel>
+                    <Slider x:Name="SnowDensity" Maximum="100" Minimum="0" ValueChanged="OnSnowSliderChanged" />
+                    <DockPanel Margin="0,16,0,4"><TextBlock x:Name="SnowSpeedValue" DockPanel.Dock="Right" Style="{StaticResource HelpText}" /><TextBlock Text="Speed" /></DockPanel>
+                    <Slider x:Name="SnowSpeed" Maximum="100" Minimum="0" ValueChanged="OnSnowSliderChanged" />
+                    <DockPanel Margin="0,16,0,4"><TextBlock x:Name="SnowWindValue" DockPanel.Dock="Right" Style="{StaticResource HelpText}" /><TextBlock Text="Wind" /></DockPanel>
+                    <Slider x:Name="SnowWind" Maximum="100" Minimum="0" ValueChanged="OnSnowSliderChanged" />
+                    <DockPanel Margin="0,16,0,4"><TextBlock x:Name="SnowSizeValue" DockPanel.Dock="Right" Style="{StaticResource HelpText}" /><TextBlock Text="Flake size" /></DockPanel>
+                    <Slider x:Name="SnowFlakeSize" Maximum="100" Minimum="0" ValueChanged="OnSnowSliderChanged" />
+                    <DockPanel Margin="0,20,0,0">
+                        <ui:ToggleSwitch x:Name="MotionBlur" DockPanel.Dock="Right" Checked="OnSnowChanged" Unchecked="OnSnowChanged" />
+                        <TextBlock VerticalAlignment="Center" Text="Motion blur" />
+                    </DockPanel>
+                </StackPanel>
 
-                <DockPanel Margin="0,20,0,4"><TextBlock x:Name="DensityValue" DockPanel.Dock="Right" Style="{StaticResource HelpText}" /><TextBlock Text="Density" /></DockPanel>
-                <Slider x:Name="Density" Maximum="100" Minimum="0" ValueChanged="OnSliderChanged" />
-                <DockPanel Margin="0,16,0,4"><TextBlock x:Name="SpeedValue" DockPanel.Dock="Right" Style="{StaticResource HelpText}" /><TextBlock Text="Speed" /></DockPanel>
-                <Slider x:Name="Speed" Maximum="100" Minimum="0" ValueChanged="OnSliderChanged" />
-                <DockPanel Margin="0,16,0,4"><TextBlock x:Name="WindValue" DockPanel.Dock="Right" Style="{StaticResource HelpText}" /><TextBlock Text="Wind" /></DockPanel>
-                <Slider x:Name="Wind" Maximum="100" Minimum="0" ValueChanged="OnSliderChanged" />
-                <DockPanel Margin="0,16,0,4"><TextBlock x:Name="SizeValue" DockPanel.Dock="Right" Style="{StaticResource HelpText}" /><TextBlock Text="Flake size" /></DockPanel>
-                <Slider x:Name="FlakeSize" Maximum="100" Minimum="0" ValueChanged="OnSliderChanged" />
+                <StackPanel x:Name="RainPanel" Margin="0,20,0,0" Visibility="Collapsed">
+                    <DockPanel Margin="0,0,0,4">
+                        <ui:ToggleSwitch x:Name="RainEnabled" DockPanel.Dock="Right" Checked="OnRainChanged" Unchecked="OnRainChanged" />
+                        <ui:TextBlock VerticalAlignment="Center" FontTypography="Subtitle" Text="Rain" />
+                    </DockPanel>
+                    <TextBlock Style="{StaticResource HelpText}" Text="Changes show in the preview right away, and on your desktop too if this image is applied." />
+                    <DockPanel Margin="0,20,0,4"><TextBlock x:Name="RainDensityValue" DockPanel.Dock="Right" Style="{StaticResource HelpText}" /><TextBlock Text="Density" /></DockPanel>
+                    <Slider x:Name="RainDensity" Maximum="100" Minimum="0" ValueChanged="OnRainSliderChanged" />
+                    <DockPanel Margin="0,16,0,4"><TextBlock x:Name="RainSpeedValue" DockPanel.Dock="Right" Style="{StaticResource HelpText}" /><TextBlock Text="Speed" /></DockPanel>
+                    <Slider x:Name="RainSpeed" Maximum="100" Minimum="0" ValueChanged="OnRainSliderChanged" />
+                    <DockPanel Margin="0,16,0,4"><TextBlock x:Name="RainWindValue" DockPanel.Dock="Right" Style="{StaticResource HelpText}" /><TextBlock Text="Wind" /></DockPanel>
+                    <Slider x:Name="RainWind" Maximum="100" Minimum="0" ValueChanged="OnRainSliderChanged" />
+                    <DockPanel Margin="0,16,0,4"><TextBlock x:Name="RainLengthValue" DockPanel.Dock="Right" Style="{StaticResource HelpText}" /><TextBlock Text="Streak length" /></DockPanel>
+                    <Slider x:Name="RainLength" Maximum="100" Minimum="0" ValueChanged="OnRainSliderChanged" />
+                    <DockPanel Margin="0,16,0,4"><TextBlock x:Name="RainBrightnessValue" DockPanel.Dock="Right" Style="{StaticResource HelpText}" /><TextBlock Text="Brightness" /></DockPanel>
+                    <Slider x:Name="RainBrightness" Maximum="100" Minimum="0" ValueChanged="OnRainSliderChanged" />
+                </StackPanel>
 
-                <DockPanel Margin="0,20,0,0">
-                    <ui:ToggleSwitch x:Name="MotionBlur" DockPanel.Dock="Right" Checked="OnSnowChanged" Unchecked="OnSnowChanged" />
-                    <TextBlock VerticalAlignment="Center" Text="Motion blur" />
-                </DockPanel>
+                <StackPanel x:Name="GlassPanel" Margin="0,20,0,0" Visibility="Collapsed">
+                    <DockPanel Margin="0,0,0,4">
+                        <ui:ToggleSwitch x:Name="GlassEnabled" DockPanel.Dock="Right" Checked="OnGlassChanged" Unchecked="OnGlassChanged" />
+                        <ui:TextBlock VerticalAlignment="Center" FontTypography="Subtitle" Text="Glass" />
+                    </DockPanel>
+                    <TextBlock Style="{StaticResource HelpText}" Text="Changes show in the preview right away, and on your desktop too if this image is applied." />
+                    <DockPanel Margin="0,20,0,4"><TextBlock x:Name="GlassDropsValue" DockPanel.Dock="Right" Style="{StaticResource HelpText}" /><TextBlock Text="Drops" /></DockPanel>
+                    <Slider x:Name="GlassDrops" Maximum="100" Minimum="0" ValueChanged="OnGlassSliderChanged" />
+                    <DockPanel Margin="0,16,0,4"><TextBlock x:Name="GlassDropSizeValue" DockPanel.Dock="Right" Style="{StaticResource HelpText}" /><TextBlock Text="Drop size" /></DockPanel>
+                    <Slider x:Name="GlassDropSize" Maximum="100" Minimum="0" ValueChanged="OnGlassSliderChanged" />
+                    <DockPanel Margin="0,16,0,4"><TextBlock x:Name="GlassSlidingValue" DockPanel.Dock="Right" Style="{StaticResource HelpText}" /><TextBlock Text="Sliding" /></DockPanel>
+                    <Slider x:Name="GlassSliding" Maximum="100" Minimum="0" ValueChanged="OnGlassSliderChanged" />
+                    <DockPanel Margin="0,16,0,4"><TextBlock x:Name="GlassFogValue" DockPanel.Dock="Right" Style="{StaticResource HelpText}" /><TextBlock Text="Fog" /></DockPanel>
+                    <Slider x:Name="GlassFog" Maximum="100" Minimum="0" ValueChanged="OnGlassSliderChanged" />
+                </StackPanel>
+
+                <StackPanel x:Name="WaterPanel" Margin="0,20,0,0" Visibility="Collapsed">
+                    <DockPanel Margin="0,0,0,4">
+                        <ui:ToggleSwitch x:Name="WaterEnabled" DockPanel.Dock="Right" Checked="OnWaterChanged" Unchecked="OnWaterChanged" />
+                        <ui:TextBlock VerticalAlignment="Center" FontTypography="Subtitle" Text="Water" />
+                    </DockPanel>
+                    <TextBlock Style="{StaticResource HelpText}" Text="Changes show in the preview right away, and on your desktop too if this image is applied." />
+                    <DockPanel Margin="0,20,0,4"><TextBlock x:Name="WaterStretchValue" DockPanel.Dock="Right" Style="{StaticResource HelpText}" /><TextBlock Text="Stretch" /></DockPanel>
+                    <Slider x:Name="WaterStretch" Maximum="100" Minimum="0" ValueChanged="OnWaterSliderChanged" />
+                    <DockPanel Margin="0,16,0,4"><TextBlock x:Name="WaterFoamValue" DockPanel.Dock="Right" Style="{StaticResource HelpText}" /><TextBlock Text="Foam" /></DockPanel>
+                    <Slider x:Name="WaterFoam" Maximum="100" Minimum="0" ValueChanged="OnWaterSliderChanged" />
+                    <DockPanel Margin="0,16,0,4"><TextBlock x:Name="WaterMistValue" DockPanel.Dock="Right" Style="{StaticResource HelpText}" /><TextBlock Text="Mist" /></DockPanel>
+                    <Slider x:Name="WaterMist" Maximum="100" Minimum="0" ValueChanged="OnWaterSliderChanged" />
+                </StackPanel>
 
                 <TextBlock Style="{StaticResource SectionLabel}" Text="Regions" />
-                <TextBlock Style="{StaticResource HelpText}" Text="Without regions, snow covers the whole picture. Add a region and drag its corners onto a window or the sky." />
+                <TextBlock x:Name="RegionsHelp" Style="{StaticResource HelpText}" />
                 <Grid Margin="0,12,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="8" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <ui:Button x:Name="AddRegionButton" Grid.Column="0" HorizontalAlignment="Stretch" Appearance="Primary" Click="OnAddRegion" Content="Add region" Icon="{ui:SymbolIcon Add24}" />
-                    <ui:Button x:Name="DeleteRegionButton" Grid.Column="2" HorizontalAlignment="Stretch" Click="OnDeleteRegion" Content="Delete region" Icon="{ui:SymbolIcon Delete24}" IsEnabled="False" />
+                    <ui:Button x:Name="AddRegionButton" Grid.Column="0" HorizontalAlignment="Stretch" Appearance="Primary" Click="OnAddRegion" Icon="{ui:SymbolIcon Add24}" />
+                    <ui:Button x:Name="DeleteRegionButton" Grid.Column="2" HorizontalAlignment="Stretch" Click="OnDeleteRegion" Icon="{ui:SymbolIcon Delete24}" IsEnabled="False" />
                 </Grid>
-                <DockPanel Margin="0,16,0,0">
+                <DockPanel x:Name="InvertRow" Margin="0,16,0,0">
                     <ui:ToggleSwitch x:Name="InvertRegions" DockPanel.Dock="Right" Checked="OnInvertChanged" Unchecked="OnInvertChanged" />
-                    <TextBlock Margin="0,0,12,0" VerticalAlignment="Center" Text="Snow everywhere except the regions" TextWrapping="Wrap" />
+                    <TextBlock x:Name="InvertLabel" Margin="0,0,12,0" VerticalAlignment="Center" TextWrapping="Wrap" />
                 </DockPanel>
                 <DockPanel Margin="0,16,0,4"><TextBlock x:Name="FeatherValue" DockPanel.Dock="Right" Style="{StaticResource HelpText}" /><TextBlock Text="Soft edge" /></DockPanel>
                 <Slider x:Name="Feather" IsSnapToTickEnabled="True" LargeChange="1" Maximum="10" Minimum="0" SmallChange="0.1" TickFrequency="0.1" ValueChanged="OnFeatherChanged" />
@@ -85,7 +235,7 @@
                     <ui:Button x:Name="UndoButton" Grid.Column="0" HorizontalAlignment="Stretch" Click="OnUndo" Content="Undo" Icon="{ui:SymbolIcon ArrowUndo24}" IsEnabled="False" ToolTip="Undo (Ctrl+Z)" />
                     <ui:Button x:Name="RedoButton" Grid.Column="2" HorizontalAlignment="Stretch" Click="OnRedo" Content="Redo" Icon="{ui:SymbolIcon ArrowRedo24}" IsEnabled="False" ToolTip="Redo (Ctrl+Y)" />
                 </Grid>
-                <TextBlock Margin="0,8,0,0" Style="{StaticResource HelpText}" Text="Click an edge to add a corner. Right-click a corner, or select it and press Delete, to remove it." />
+                <TextBlock x:Name="CornerHelp" Margin="0,8,0,0" Style="{StaticResource HelpText}" Text="Click an edge to add a corner. Right-click a corner, or select it and press Delete, to remove it." />
 
                 <TextBlock Style="{StaticResource SectionLabel}" Text="Scaling" />
                 <ComboBox x:Name="ScalingChoice" SelectionChanged="OnScalingChanged">

@@ -16,6 +16,7 @@ public sealed class PreviewRenderer : IDisposable
     private const int ResizeSettleMs = 150;
     private const int IdleSleepMs = 60;
     private const int OccludedSleepMs = 120;
+    private const uint Seed = 20261119;
 
     private readonly nint _window;
     private readonly Thread _thread;
@@ -26,7 +27,13 @@ public sealed class PreviewRenderer : IDisposable
     private (string Path, WallpaperScaling Scaling, Size Reference)? _image;
     private int _imageVersion;
     private SnowSettings _snow = new();
-    private RegionSet _regions = RegionSet.Empty;
+    private RainSettings _rain = new();
+    private GlassSettings _glass = new();
+    private WaterSettings _water = new();
+    private RegionSet _snowRegions = RegionSet.Empty;
+    private RegionSet _rainRegions = RegionSet.Empty;
+    private RegionSet _glassRegions = RegionSet.Empty;
+    private RegionSet _waterRegions = RegionSet.Empty;
     private OverlayFrame _overlay = new([], 1f);
     private volatile bool _thirtyFps;
 
@@ -64,7 +71,33 @@ public sealed class PreviewRenderer : IDisposable
 
     public void SetSnow(SnowSettings settings) => Volatile.Write(ref _snow, settings);
 
-    public void SetRegions(RegionSet regions) => Volatile.Write(ref _regions, regions);
+    public void SetRain(RainSettings settings) => Volatile.Write(ref _rain, settings);
+
+    public void SetGlass(GlassSettings settings) => Volatile.Write(ref _glass, settings);
+
+    public void SetWater(WaterSettings settings) => Volatile.Write(ref _water, settings);
+
+    public void SetRegions(EffectKind kind, RegionSet regions)
+    {
+        ArgumentNullException.ThrowIfNull(regions);
+        switch (kind)
+        {
+            case EffectKind.Snow:
+                Volatile.Write(ref _snowRegions, regions);
+                break;
+            case EffectKind.Rain:
+                Volatile.Write(ref _rainRegions, regions);
+                break;
+            case EffectKind.Glass:
+                Volatile.Write(ref _glassRegions, regions);
+                break;
+            case EffectKind.Water:
+                Volatile.Write(ref _waterRegions, regions);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown effect.");
+        }
+    }
 
     /// <summary>The editor's outlines and handles, in image coordinates; drawn over the scene with the scene's own image rectangle.</summary>
     public void SetOverlay(IReadOnlyList<OverlayShape> shapes, float scale) => Volatile.Write(ref _overlay, new OverlayFrame(shapes, scale));
@@ -86,7 +119,7 @@ public sealed class PreviewRenderer : IDisposable
             using var overlay = new RegionOverlayRenderer(gpu);
             WallpaperSurface? surface = null;
             WallpaperScene? scene = null;
-            SnowEffect? snow = null;
+            SceneEffects? effects = null;
             var builtVersion = -1;
             var builtSize = Size.Empty;
             var clock = Stopwatch.StartNew();
@@ -126,10 +159,10 @@ public sealed class PreviewRenderer : IDisposable
                     {
                         scene?.Dispose();
                         scene = null;
-                        snow = null;
+                        effects = null;
                         try
                         {
-                            (scene, snow) = BuildScene(gpu, background, wanted.Path, wanted.Scaling, wanted.Reference, size);
+                            (scene, effects) = BuildScene(gpu, background, wanted.Path, wanted.Scaling, wanted.Reference, size);
                         }
                         catch (Exception ex) when (ex is not OutOfMemoryException)
                         {
@@ -142,10 +175,16 @@ public sealed class PreviewRenderer : IDisposable
                     var now = clock.Elapsed.TotalSeconds;
                     var dt = Math.Clamp(now - last, 0, 0.1);
                     last = now;
-                    if (scene is not null && snow is not null)
+                    if (scene is not null && effects is not null)
                     {
-                        snow.Apply(Volatile.Read(ref _snow));
-                        scene.SetRegions(EffectKind.Snow, Volatile.Read(ref _regions));
+                        effects.Snow.Apply(Volatile.Read(ref _snow));
+                        effects.Rain.Apply(Volatile.Read(ref _rain));
+                        effects.Glass.Apply(Volatile.Read(ref _glass));
+                        effects.Water.Apply(Volatile.Read(ref _water));
+                        scene.SetRegions(EffectKind.Snow, Volatile.Read(ref _snowRegions));
+                        scene.SetRegions(EffectKind.Rain, Volatile.Read(ref _rainRegions));
+                        scene.SetRegions(EffectKind.Glass, Volatile.Read(ref _glassRegions));
+                        scene.SetRegions(EffectKind.Water, Volatile.Read(ref _waterRegions));
                         scene.Update(new FrameTime(dt, now), size);
                         scene.Render(surface.BackBuffer, size);
                         var frame = Volatile.Read(ref _overlay);
@@ -174,7 +213,7 @@ public sealed class PreviewRenderer : IDisposable
     }
 
     /// <summary>Builds the scene as the reference monitor would show it, scaled down to the preview.</summary>
-    private static (WallpaperScene Scene, SnowEffect Snow) BuildScene(GpuDevice gpu, ImageQuadRenderer background, string path, WallpaperScaling scaling, Size reference, Size target)
+    private static (WallpaperScene Scene, SceneEffects Effects) BuildScene(GpuDevice gpu, ImageQuadRenderer background, string path, WallpaperScaling scaling, Size reference, Size target)
     {
         var imageSize = WicImageLoader.ReadSize(path);
         var crop = ScalingMath.ComputeSourceCrop(imageSize, reference, scaling);
@@ -186,12 +225,28 @@ public sealed class PreviewRenderer : IDisposable
         var scene = new WallpaperScene(gpu, background, gpu.CreateImageTexture(decoded),
             ScalingMath.ComputeScaledDestination(crop.Size, reference, target, scaling),
             ScalingMath.ComputeScaledDestination(imageSize, reference, target, scaling));
-        var snow = new SnowEffect(gpu, 20261119);
-        scene.Effects.Add(snow);
-        return (scene, snow);
+        try
+        {
+            var snow = new SnowEffect(gpu, Seed);
+            scene.Effects.Add(snow);
+            var rain = new RainEffect(gpu, Seed ^ 0x9e3779b9);
+            scene.Effects.Add(rain);
+            var glass = new GlassEffect(gpu);
+            scene.Effects.Add(glass);
+            var water = new WaterEffect(gpu);
+            scene.Effects.Add(water);
+            return (scene, new SceneEffects(snow, rain, glass, water));
+        }
+        catch
+        {
+            scene.Dispose();
+            throw;
+        }
     }
 
     private sealed record OverlayFrame(IReadOnlyList<OverlayShape> Shapes, float Scale);
+
+    private sealed record SceneEffects(SnowEffect Snow, RainEffect Rain, GlassEffect Glass, WaterEffect Water);
 
     private static GpuDevice CreateGpu()
     {

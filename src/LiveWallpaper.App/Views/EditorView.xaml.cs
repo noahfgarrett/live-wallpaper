@@ -24,13 +24,17 @@ public partial class EditorView : UserControl
     private readonly EngineConnection _engine;
     private readonly LibraryService _library;
     private readonly DispatcherTimer _saveTimer = new() { Interval = SaveDelay };
-    private readonly UpdateCoalescer<SnowSettings> _liveUpdates;
-    private readonly UpdateCoalescer<RegionSet> _liveRegions;
+    private readonly UpdateCoalescer<SnowSettings> _liveSnow;
+    private readonly UpdateCoalescer<RainSettings> _liveRain;
+    private readonly UpdateCoalescer<GlassSettings> _liveGlass;
+    private readonly UpdateCoalescer<WaterSettings> _liveWater;
+    private readonly Dictionary<EffectKind, UpdateCoalescer<RegionSet>> _liveRegions = [];
     private readonly DispatcherTimer _featherCommit = new() { Interval = FeatherCommitDelay };
-    private readonly RegionEditor _regions;
+    private readonly Dictionary<EffectKind, RegionEditor> _editors = [];
     private readonly double _aspect;
     private readonly System.Drawing.Size _monitorSize;
     private LibraryItem _item;
+    private EffectKind _activeTab = EffectKind.Snow;
     private bool _loading = true;
     private bool _syncingRegions;
 
@@ -46,16 +50,23 @@ public partial class EditorView : UserControl
             ? new System.Drawing.Size(1920, 1080)
             : primary.Bounds.Size;
         _aspect = _monitorSize.Width / (double)_monitorSize.Height;
-        _liveUpdates = new UpdateCoalescer<SnowSettings>(SendLiveAsync, LiveUpdateInterval);
-        _liveRegions = new UpdateCoalescer<RegionSet>(SendRegionsAsync, LiveUpdateInterval);
+        _liveSnow = new UpdateCoalescer<SnowSettings>(snow => _engine.SendAsync(new UpdateSnow(_item.Id, snow), CancellationToken.None), LiveUpdateInterval);
+        _liveRain = new UpdateCoalescer<RainSettings>(rain => _engine.SendAsync(new UpdateRain(_item.Id, rain), CancellationToken.None), LiveUpdateInterval);
+        _liveGlass = new UpdateCoalescer<GlassSettings>(glass => _engine.SendAsync(new UpdateGlass(_item.Id, glass), CancellationToken.None), LiveUpdateInterval);
+        _liveWater = new UpdateCoalescer<WaterSettings>(water => _engine.SendAsync(new UpdateWater(_item.Id, water), CancellationToken.None), LiveUpdateInterval);
         _saveTimer.Tick += (_, _) => Save();
-        _regions = new RegionEditor(item.Regions);
-        _regions.Changed += (_, _) => OnRegionsChanged();
-        _featherCommit.Tick += (_, _) =>
+        // The flow arrows are clamped in the source image's own proportions.
+        var imageAspect = item.PixelWidth > 0 && item.PixelHeight > 0 ? item.PixelWidth / (double)item.PixelHeight : 1;
+        foreach (var kind in Enum.GetValues<EffectKind>())
         {
-            _featherCommit.Stop();
-            _regions.SetFeather(Math.Round(Feather.Value, 1), commit: true);
-        };
+            var editor = new RegionEditor(RegionsOf(item, kind), ModeOf(kind), imageAspect);
+            editor.Changed += (_, _) => OnRegionsChanged(kind);
+            _editors[kind] = editor;
+            // One coalescer per effect, so a change to one effect's regions never replaces another's pending update.
+            _liveRegions[kind] = new UpdateCoalescer<RegionSet>(
+                regions => _engine.SendAsync(new UpdateRegions(_item.Id, kind, regions), CancellationToken.None), LiveUpdateInterval);
+        }
+        _featherCommit.Tick += (_, _) => CommitFeather();
         Preview.PointerInput += OnPreviewPointer;
         Preview.PixelSizeChanged += (_, _) => UpdateRegionView();
         ApplyPanel.Closed += (_, _) =>
@@ -66,19 +77,45 @@ public partial class EditorView : UserControl
 
         Heading.Text = item.DisplayName;
         SnowEnabled.IsChecked = item.Snow.Enabled;
-        Density.Value = item.Snow.DensityPct;
-        Speed.Value = item.Snow.SpeedPct;
-        Wind.Value = item.Snow.WindPct;
-        FlakeSize.Value = item.Snow.SizePct;
+        SnowDensity.Value = item.Snow.DensityPct;
+        SnowSpeed.Value = item.Snow.SpeedPct;
+        SnowWind.Value = item.Snow.WindPct;
+        SnowFlakeSize.Value = item.Snow.SizePct;
         MotionBlur.IsChecked = item.Snow.MotionBlur;
+        var rain = item.Rain.Settings;
+        RainEnabled.IsChecked = rain.Enabled;
+        RainDensity.Value = rain.DensityPct;
+        RainSpeed.Value = rain.SpeedPct;
+        RainWind.Value = rain.WindPct;
+        RainLength.Value = rain.LengthPct;
+        RainBrightness.Value = rain.BrightnessPct;
+        var glass = item.Glass.Settings;
+        GlassEnabled.IsChecked = glass.Enabled;
+        GlassDrops.Value = glass.DropsPct;
+        GlassDropSize.Value = glass.DropSizePct;
+        GlassSliding.Value = glass.SlidingPct;
+        GlassFog.Value = glass.FogPct;
+        var water = item.Water.Settings;
+        WaterEnabled.IsChecked = water.Enabled;
+        WaterStretch.Value = water.StretchPct;
+        WaterFoam.Value = water.FoamPct;
+        WaterMist.Value = water.MistPct;
         var scaling = window.LastStatus?.Settings.DefaultScaling ?? WallpaperScaling.Fill;
         SelectScaling(scaling);
         Preview.SetFrameRate(window.LastStatus?.Settings.FrameRate ?? FrameRateMode.Fps60);
         Preview.SetSnow(item.Snow);
-        Preview.SetRegions(item.Regions);
+        Preview.SetRain(rain);
+        Preview.SetGlass(glass);
+        Preview.SetWater(water);
+        foreach (var kind in Enum.GetValues<EffectKind>())
+        {
+            Preview.SetRegions(kind, RegionsOf(item, kind));
+        }
         Preview.SetImage(library.ImagePath(item), scaling, _monitorSize);
         _loading = false;
         UpdateLabels();
+        UpdateTabDots();
+        ShowTabLayout();
         UpdateRegionView();
         SyncRegionControls();
     }
@@ -96,15 +133,70 @@ public partial class EditorView : UserControl
 
     private bool IsOnDesktop => _window.LastStatus?.Monitors.Any(m => m.IsShown && m.LibraryItemId == _item.Id) == true;
 
+    private RegionEditor ActiveEditor => _editors[_activeTab];
+
+    private static RegionEditMode ModeOf(EffectKind kind) => kind switch
+    {
+        EffectKind.Snow or EffectKind.Rain => RegionEditMode.Free,
+        EffectKind.Glass => RegionEditMode.Plane,
+        EffectKind.Water => RegionEditMode.Flow,
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown effect."),
+    };
+
+    private static RegionSet RegionsOf(LibraryItem item, EffectKind kind) => kind switch
+    {
+        EffectKind.Snow => item.Regions,
+        EffectKind.Rain => item.Rain.Regions,
+        EffectKind.Glass => item.Glass.Regions,
+        EffectKind.Water => item.Water.Regions,
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown effect."),
+    };
+
+    private static LibraryItem WithRegions(LibraryItem item, EffectKind kind, RegionSet regions) => kind switch
+    {
+        EffectKind.Snow => item with { Regions = regions },
+        EffectKind.Rain => item with { Rain = item.Rain with { Regions = regions } },
+        EffectKind.Glass => item with { Glass = item.Glass with { Regions = regions } },
+        EffectKind.Water => item with { Water = item.Water with { Regions = regions } },
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown effect."),
+    };
+
     private SnowSettings CurrentSnow() => new(
         SnowEnabled.IsChecked == true,
-        Math.Round(Density.Value),
-        Math.Round(Speed.Value),
-        Math.Round(Wind.Value),
-        Math.Round(FlakeSize.Value),
+        Math.Round(SnowDensity.Value),
+        Math.Round(SnowSpeed.Value),
+        Math.Round(SnowWind.Value),
+        Math.Round(SnowFlakeSize.Value),
         MotionBlur.IsChecked == true);
 
-    private void OnSliderChanged(object sender, RoutedPropertyChangedEventArgs<double> e) => OnSnowChanged(sender, e);
+    private RainSettings CurrentRain() => new(
+        RainEnabled.IsChecked == true,
+        Math.Round(RainDensity.Value),
+        Math.Round(RainSpeed.Value),
+        Math.Round(RainWind.Value),
+        Math.Round(RainLength.Value),
+        Math.Round(RainBrightness.Value));
+
+    private GlassSettings CurrentGlass() => new(
+        GlassEnabled.IsChecked == true,
+        Math.Round(GlassDrops.Value),
+        Math.Round(GlassDropSize.Value),
+        Math.Round(GlassSliding.Value),
+        Math.Round(GlassFog.Value));
+
+    private WaterSettings CurrentWater() => new(
+        WaterEnabled.IsChecked == true,
+        Math.Round(WaterStretch.Value),
+        Math.Round(WaterFoam.Value),
+        Math.Round(WaterMist.Value));
+
+    private void OnSnowSliderChanged(object sender, RoutedPropertyChangedEventArgs<double> e) => OnSnowChanged(sender, e);
+
+    private void OnRainSliderChanged(object sender, RoutedPropertyChangedEventArgs<double> e) => OnRainChanged(sender, e);
+
+    private void OnGlassSliderChanged(object sender, RoutedPropertyChangedEventArgs<double> e) => OnGlassChanged(sender, e);
+
+    private void OnWaterSliderChanged(object sender, RoutedPropertyChangedEventArgs<double> e) => OnWaterChanged(sender, e);
 
     private void OnSnowChanged(object sender, RoutedEventArgs e)
     {
@@ -112,16 +204,111 @@ public partial class EditorView : UserControl
         {
             return;
         }
-        UpdateLabels();
         var snow = CurrentSnow();
         Preview.SetSnow(snow);
         _item = _item with { Snow = snow };
-        _saveTimer.Stop();
-        _saveTimer.Start();
+        OnSettingsChanged();
         if (IsOnDesktop)
         {
-            _liveUpdates.Post(snow);
+            _liveSnow.Post(snow);
         }
+    }
+
+    private void OnRainChanged(object sender, RoutedEventArgs e)
+    {
+        if (_loading)
+        {
+            return;
+        }
+        var rain = CurrentRain();
+        Preview.SetRain(rain);
+        _item = _item with { Rain = _item.Rain with { Settings = rain } };
+        OnSettingsChanged();
+        if (IsOnDesktop)
+        {
+            _liveRain.Post(rain);
+        }
+    }
+
+    private void OnGlassChanged(object sender, RoutedEventArgs e)
+    {
+        if (_loading)
+        {
+            return;
+        }
+        var glass = CurrentGlass();
+        Preview.SetGlass(glass);
+        _item = _item with { Glass = _item.Glass with { Settings = glass } };
+        OnSettingsChanged();
+        if (IsOnDesktop)
+        {
+            _liveGlass.Post(glass);
+        }
+    }
+
+    private void OnWaterChanged(object sender, RoutedEventArgs e)
+    {
+        if (_loading)
+        {
+            return;
+        }
+        var water = CurrentWater();
+        Preview.SetWater(water);
+        _item = _item with { Water = _item.Water with { Settings = water } };
+        OnSettingsChanged();
+        if (IsOnDesktop)
+        {
+            _liveWater.Post(water);
+        }
+    }
+
+    private void OnSettingsChanged()
+    {
+        UpdateLabels();
+        UpdateTabDots();
+        _saveTimer.Stop();
+        _saveTimer.Start();
+    }
+
+    private void OnTabChecked(object sender, RoutedEventArgs e)
+    {
+        if (_loading || sender is not RadioButton { Tag: EffectKind kind } || kind == _activeTab)
+        {
+            return;
+        }
+        CommitFeather();
+        var previous = ActiveEditor;
+        _activeTab = kind;
+        // Ends a drag in progress on the tab being left; its regions stay as they were before the drag.
+        previous.SetEnabled(false);
+        previous.SetEnabled(ShowOutlines.IsChecked == true);
+        ShowTabLayout();
+        Preview.SetOverlay(ActiveEditor.Overlay(), (float)DpiScale);
+        SyncRegionControls();
+    }
+
+    private void ShowTabLayout()
+    {
+        SnowPanel.Visibility = _activeTab == EffectKind.Snow ? Visibility.Visible : Visibility.Collapsed;
+        RainPanel.Visibility = _activeTab == EffectKind.Rain ? Visibility.Visible : Visibility.Collapsed;
+        GlassPanel.Visibility = _activeTab == EffectKind.Glass ? Visibility.Visible : Visibility.Collapsed;
+        WaterPanel.Visibility = _activeTab == EffectKind.Water ? Visibility.Visible : Visibility.Collapsed;
+        var copy = RegionCopy.For(_activeTab);
+        RegionsHelp.Text = copy.Help;
+        AddRegionButton.Content = copy.Add;
+        DeleteRegionButton.Content = copy.Delete;
+        InvertRow.Visibility = copy.Invert is null ? Visibility.Collapsed : Visibility.Visible;
+        InvertLabel.Text = copy.Invert ?? string.Empty;
+        // A pane always has 4 corners, so corners can't be added or removed on the glass tab.
+        CornerHelp.Visibility = ModeOf(_activeTab) == RegionEditMode.Plane ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private void UpdateTabDots()
+    {
+        SnowDot.Visibility = SnowEnabled.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        RainDot.Visibility = RainEnabled.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        GlassDot.Visibility = GlassEnabled.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        WaterDot.Visibility = WaterEnabled.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void OnScalingChanged(object sender, SelectionChangedEventArgs e)
@@ -144,37 +331,45 @@ public partial class EditorView : UserControl
     private void UpdateRegionView()
     {
         var pixels = Preview.PixelSize;
-        if (pixels.Width < 2 || pixels.Height < 2 || _item.PixelWidth <= 0 || _item.PixelHeight <= 0)
+        RegionView? view = null;
+        if (pixels.Width >= 2 && pixels.Height >= 2 && _item.PixelWidth > 0 && _item.PixelHeight > 0)
         {
-            _regions.SetView(null);
-            return;
+            var imageBounds = ScalingMath.ComputeScaledDestination(new System.Drawing.Size(_item.PixelWidth, _item.PixelHeight), _monitorSize, pixels, SelectedScaling());
+            view = new RegionView(imageBounds, pixels, DpiScale);
         }
-        var imageBounds = ScalingMath.ComputeScaledDestination(new System.Drawing.Size(_item.PixelWidth, _item.PixelHeight), _monitorSize, pixels, SelectedScaling());
-        _regions.SetView(new RegionView(imageBounds, pixels, DpiScale));
+        foreach (var editor in _editors.Values)
+        {
+            editor.SetView(view);
+        }
     }
 
-    private void OnRegionsChanged()
+    private void OnRegionsChanged(EffectKind kind)
     {
-        var state = _regions.State;
-        Preview.SetRegions(state);
-        Preview.SetOverlay(_regions.Overlay(), (float)DpiScale);
-        SyncRegionControls();
-        if (state.Equals(_item.Regions))
+        var editor = _editors[kind];
+        var state = editor.State;
+        Preview.SetRegions(kind, state);
+        if (kind == _activeTab)
+        {
+            Preview.SetOverlay(editor.Overlay(), (float)DpiScale);
+            SyncRegionControls();
+        }
+        if (state.Equals(RegionsOf(_item, kind)))
         {
             return;
         }
-        _item = _item with { Regions = state };
+        _item = WithRegions(_item, kind, state);
         _saveTimer.Stop();
         _saveTimer.Start();
         if (IsOnDesktop)
         {
-            _liveRegions.Post(state);
+            _liveRegions[kind].Post(state);
         }
     }
 
     private void SyncRegionControls()
     {
-        var state = _regions.State;
+        var editor = ActiveEditor;
+        var state = editor.State;
         _syncingRegions = true;
         InvertRegions.IsChecked = state.Invert;
         if (!_featherCommit.IsEnabled && Math.Abs(Feather.Value - state.FeatherPct) > 1e-9)
@@ -183,28 +378,29 @@ public partial class EditorView : UserControl
         }
         _syncingRegions = false;
         FeatherValue.Text = $"{state.FeatherPct:0.0}%";
-        AddRegionButton.IsEnabled = _regions.CanAddRegion;
-        DeleteRegionButton.IsEnabled = _regions.SelectedRegion is not null;
-        UndoButton.IsEnabled = _regions.CanUndo;
-        RedoButton.IsEnabled = _regions.CanRedo;
+        AddRegionButton.IsEnabled = editor.CanAddRegion;
+        DeleteRegionButton.IsEnabled = editor.SelectedRegion is not null;
+        UndoButton.IsEnabled = editor.CanUndo;
+        RedoButton.IsEnabled = editor.CanRedo;
     }
 
     private void OnPreviewPointer(object? sender, PreviewPointerEventArgs e)
     {
+        var editor = ActiveEditor;
         switch (e.Action)
         {
             case PreviewPointerAction.Pressed:
                 Focus();
-                _regions.PointerDown(e.Position);
+                editor.PointerDown(e.Position);
                 break;
             case PreviewPointerAction.Moved:
-                _regions.PointerMove(e.Position);
+                editor.PointerMove(e.Position);
                 break;
             case PreviewPointerAction.Released:
-                _regions.PointerUp();
+                editor.PointerUp();
                 break;
             case PreviewPointerAction.SecondaryClicked:
-                _regions.RemoveVertexAt(e.Position);
+                editor.RemoveVertexAt(e.Position);
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(e), e.Action, "Unknown pointer action.");
@@ -214,16 +410,16 @@ public partial class EditorView : UserControl
     private void OnAddRegion(object sender, RoutedEventArgs e)
     {
         ShowOutlines.IsChecked = true;
-        _regions.AddRegion();
+        ActiveEditor.AddRegion();
     }
 
-    private void OnDeleteRegion(object sender, RoutedEventArgs e) => _regions.DeleteSelectedRegion();
+    private void OnDeleteRegion(object sender, RoutedEventArgs e) => ActiveEditor.DeleteSelectedRegion();
 
     private void OnInvertChanged(object sender, RoutedEventArgs e)
     {
         if (!_loading && !_syncingRegions)
         {
-            _regions.SetInvert(InvertRegions.IsChecked == true);
+            ActiveEditor.SetInvert(InvertRegions.IsChecked == true);
         }
     }
 
@@ -233,26 +429,43 @@ public partial class EditorView : UserControl
         {
             return;
         }
-        _regions.SetFeather(Math.Round(Feather.Value, 1), commit: false);
+        ActiveEditor.SetFeather(Math.Round(Feather.Value, 1), commit: false);
         _featherCommit.Stop();
         _featherCommit.Start();
     }
 
+    /// <summary>Commits a pending soft-edge change, if there is one, to the open tab's regions.</summary>
+    private void CommitFeather()
+    {
+        if (!_featherCommit.IsEnabled)
+        {
+            return;
+        }
+        _featherCommit.Stop();
+        ActiveEditor.SetFeather(Math.Round(Feather.Value, 1), commit: true);
+    }
+
     private void OnOutlinesChanged(object sender, RoutedEventArgs e)
     {
-        if (!_loading)
+        if (_loading)
         {
-            _regions.SetEnabled(ShowOutlines.IsChecked == true);
+            return;
+        }
+        // Shared by all tabs, so every effect's editor follows it.
+        var isShown = ShowOutlines.IsChecked == true;
+        foreach (var editor in _editors.Values)
+        {
+            editor.SetEnabled(isShown);
         }
     }
 
     private void OnUndo(object sender, RoutedEventArgs e)
     {
         _featherCommit.Stop();
-        _regions.Undo();
+        ActiveEditor.Undo();
     }
 
-    private void OnRedo(object sender, RoutedEventArgs e) => _regions.Redo();
+    private void OnRedo(object sender, RoutedEventArgs e) => ActiveEditor.Redo();
 
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
@@ -263,7 +476,7 @@ public partial class EditorView : UserControl
         var modifiers = Keyboard.Modifiers;
         if (e.Key is Key.Delete or Key.Back && modifiers == ModifierKeys.None)
         {
-            e.Handled = _regions.DeleteSelectedVertex();
+            e.Handled = ActiveEditor.DeleteSelectedVertex();
         }
         else if (e.Key == Key.Z && modifiers == ModifierKeys.Control)
         {
@@ -337,17 +550,27 @@ public partial class EditorView : UserControl
         }
     }
 
-    private Task SendLiveAsync(SnowSettings snow) => _engine.SendAsync(new UpdateSnow(_item.Id, snow), CancellationToken.None);
-
-    private Task SendRegionsAsync(RegionSet regions) => _engine.SendAsync(new UpdateRegions(_item.Id, EffectKind.Snow, regions), CancellationToken.None);
-
     private void UpdateLabels()
     {
-        DensityValue.Text = $"{Math.Round(Density.Value)}%";
-        SpeedValue.Text = $"{Math.Round(Speed.Value)}%";
-        WindValue.Text = $"{Math.Round(Wind.Value)}%";
-        SizeValue.Text = $"{Math.Round(FlakeSize.Value)}%";
+        SnowDensityValue.Text = Percent(SnowDensity);
+        SnowSpeedValue.Text = Percent(SnowSpeed);
+        SnowWindValue.Text = Percent(SnowWind);
+        SnowSizeValue.Text = Percent(SnowFlakeSize);
+        RainDensityValue.Text = Percent(RainDensity);
+        RainSpeedValue.Text = Percent(RainSpeed);
+        RainWindValue.Text = Percent(RainWind);
+        RainLengthValue.Text = Percent(RainLength);
+        RainBrightnessValue.Text = Percent(RainBrightness);
+        GlassDropsValue.Text = Percent(GlassDrops);
+        GlassDropSizeValue.Text = Percent(GlassDropSize);
+        GlassSlidingValue.Text = Percent(GlassSliding);
+        GlassFogValue.Text = Percent(GlassFog);
+        WaterStretchValue.Text = Percent(WaterStretch);
+        WaterFoamValue.Text = Percent(WaterFoam);
+        WaterMistValue.Text = Percent(WaterMist);
     }
+
+    private static string Percent(Slider slider) => $"{Math.Round(slider.Value)}%";
 
     private void SelectScaling(WallpaperScaling scaling)
     {
@@ -362,4 +585,21 @@ public partial class EditorView : UserControl
 
     private WallpaperScaling SelectedScaling() =>
         Enum.TryParse<WallpaperScaling>((ScalingChoice.SelectedItem as ComboBoxItem)?.Tag as string, out var scaling) ? scaling : WallpaperScaling.Fill;
+
+    /// <summary>The Regions panel's wording for one tab. <see cref="Invert"/> is null where the effect can't be inverted.</summary>
+    private sealed record RegionCopy(string? Invert, string Add, string Delete, string Help)
+    {
+        public static RegionCopy For(EffectKind kind) => kind switch
+        {
+            EffectKind.Snow => new("Snow everywhere except the regions", "Add region", "Delete region",
+                "Without regions, snow covers the whole picture. Add a region and drag its corners onto a window or the sky."),
+            EffectKind.Rain => new("Rain everywhere except the regions", "Add region", "Delete region",
+                "Without regions, rain covers the whole picture."),
+            EffectKind.Glass => new(null, "Add pane", "Delete pane",
+                "Without panes, the whole picture is the glass. Add a pane and drag its corners onto a window."),
+            EffectKind.Water => new(null, "Add water region", "Delete region",
+                "Add a region on a waterfall or river, then drag the arrow the way the water flows. A longer arrow flows faster."),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown effect."),
+        };
+    }
 }

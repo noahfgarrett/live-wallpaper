@@ -39,7 +39,10 @@ public sealed class PreviewHost : HwndHost
     private PreviewRenderer? _renderer;
     private (string Path, WallpaperScaling Scaling, System.Drawing.Size Reference)? _image;
     private SnowSettings _snow = new();
-    private RegionSet _regions = RegionSet.Empty;
+    private RainSettings _rain = new();
+    private GlassSettings _glass = new();
+    private WaterSettings _water = new();
+    private readonly Dictionary<EffectKind, RegionSet> _regions = [];
     private (IReadOnlyList<OverlayShape> Shapes, float Scale) _overlay = ([], 1f);
     private FrameRateMode _frameRate = FrameRateMode.Fps60;
     private bool _isPressed;
@@ -67,10 +70,29 @@ public sealed class PreviewHost : HwndHost
         _renderer?.SetSnow(settings);
     }
 
-    public void SetRegions(RegionSet regions)
+    public void SetRain(RainSettings settings)
     {
-        _regions = regions;
-        _renderer?.SetRegions(regions);
+        _rain = settings;
+        _renderer?.SetRain(settings);
+    }
+
+    public void SetGlass(GlassSettings settings)
+    {
+        _glass = settings;
+        _renderer?.SetGlass(settings);
+    }
+
+    public void SetWater(WaterSettings settings)
+    {
+        _water = settings;
+        _renderer?.SetWater(settings);
+    }
+
+    public void SetRegions(EffectKind kind, RegionSet regions)
+    {
+        ArgumentNullException.ThrowIfNull(regions);
+        _regions[kind] = regions;
+        _renderer?.SetRegions(kind, regions);
     }
 
     public void SetOverlay(IReadOnlyList<OverlayShape> shapes, float scale)
@@ -90,7 +112,13 @@ public sealed class PreviewHost : HwndHost
         _window = PreviewChildWindow.Create(hwndParent.Handle, 1, 1);
         _renderer = new PreviewRenderer(_window.Handle, new System.Drawing.Size(1, 1));
         _renderer.SetSnow(_snow);
-        _renderer.SetRegions(_regions);
+        _renderer.SetRain(_rain);
+        _renderer.SetGlass(_glass);
+        _renderer.SetWater(_water);
+        foreach (var (kind, regions) in _regions)
+        {
+            _renderer.SetRegions(kind, regions);
+        }
         _renderer.SetOverlay(_overlay.Shapes, _overlay.Scale);
         _renderer.SetFrameRate(_frameRate);
         if (_image is { } image)
