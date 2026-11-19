@@ -118,4 +118,75 @@ public sealed class LibraryStoreTests : IDisposable
         Assert.Equal(Path.GetDirectoryName(_store.ImagePath(item)), Path.GetDirectoryName(_store.ThumbnailPath(item)));
         Assert.EndsWith("thumb.jpg", _store.ThumbnailPath(item));
     }
+
+    [Fact]
+    public async Task Import_ConcurrentImports_KeepEveryItem()
+    {
+        var sources = Enumerable.Range(0, 20).Select(i => SourceFile($"photo-{i}.png")).ToList();
+
+        await Task.WhenAll(sources.Select(source => Task.Run(() => _store.Import(source, 10, 10), TestContext.Current.CancellationToken)));
+
+        Assert.Equal(20, _store.Load().Count);
+    }
+
+    [Fact]
+    public void Import_ReadOnlySource_CopyIsWritable()
+    {
+        var source = SourceFile();
+        File.SetAttributes(source, FileAttributes.ReadOnly);
+        try
+        {
+            var item = _store.Import(source, 10, 10);
+
+            Assert.False(File.GetAttributes(_store.ImagePath(item)).HasFlag(FileAttributes.ReadOnly));
+        }
+        finally
+        {
+            File.SetAttributes(source, FileAttributes.Normal);
+        }
+    }
+
+    [Fact]
+    public void Remove_ReadOnlyCopy_StillDeletesTheFolder()
+    {
+        var item = _store.Import(SourceFile(), 10, 10);
+        File.SetAttributes(_store.ImagePath(item), FileAttributes.ReadOnly);
+
+        Assert.True(_store.Remove(item.Id));
+
+        Assert.False(Directory.Exists(Path.GetDirectoryName(_store.ImagePath(item))));
+    }
+
+    [Fact]
+    public void LoadReadOnly_CorruptLibrary_ReturnsEmptyAndLeavesTheFile()
+    {
+        var index = Path.Combine(_dir.Path, "library", "library.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(index)!);
+        File.WriteAllText(index, "{ nope");
+
+        Assert.Empty(_store.LoadReadOnly());
+        Assert.Equal("{ nope", File.ReadAllText(index));
+    }
+
+    [Fact]
+    public void Update_WhileAnotherReaderHasTheIndexOpen_Succeeds()
+    {
+        var item = _store.Import(SourceFile(), 10, 10);
+        var index = Path.Combine(_dir.Path, "library", "library.json");
+        using var reader = new FileStream(index, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+
+        _store.Update(item with { Snow = new SnowSettings(DensityPct: 10) });
+
+        Assert.Equal(10, Assert.Single(_store.Load()).Snow.DensityPct);
+    }
+
+    [Fact]
+    public void Load_WhileAnotherWriterReplacesTheIndex_DoesNotBlockIt()
+    {
+        var item = _store.Import(SourceFile(), 10, 10);
+
+        _store.Update(item with { DisplayName = "Renamed" });
+
+        Assert.Equal("Renamed", Assert.Single(_store.LoadReadOnly()).DisplayName);
+    }
 }
