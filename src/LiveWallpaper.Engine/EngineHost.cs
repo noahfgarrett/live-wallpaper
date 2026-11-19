@@ -120,9 +120,10 @@ public sealed class EngineHost
         return exitCode;
     }
 
-    /// <summary>True when the engine holding the mutex is a current one with a working pipe.</summary>
+    /// <summary>True when the engine holding the mutex is a current one with a working pipe. One with an older protocol is replaced.</summary>
     private static bool CurrentEngineAnswers() =>
-        new EngineClient(EnginePipe.Name).SendAsync(new GetStatus(), TakeoverConnectTimeout, CancellationToken.None).GetAwaiter().GetResult() is StatusReport;
+        new EngineClient(EnginePipe.Name).SendAsync(new GetStatus(), TakeoverConnectTimeout, CancellationToken.None).GetAwaiter().GetResult() is StatusReport report
+        && !EngineProtocol.NeedsReplacement(report.Status);
 
     private static GpuDevice CreateGpu()
     {
@@ -249,14 +250,47 @@ public sealed class EngineHost
                 }
                 _needsPresent = true;
                 return new Ok();
+            case UpdateRain update:
+                if (!update.Rain.IsValid)
+                {
+                    return new Failed("Rain settings must be between 0 and 100%.");
+                }
+                foreach (var wallpaper in _wallpapers.Where(w => w.ItemId == update.LibraryItemId))
+                {
+                    wallpaper.Rain.Apply(update.Rain);
+                }
+                _needsPresent = true;
+                return new Ok();
+            case UpdateGlass update:
+                if (!update.Glass.IsValid)
+                {
+                    return new Failed("Glass settings must be between 0 and 100%.");
+                }
+                foreach (var wallpaper in _wallpapers.Where(w => w.ItemId == update.LibraryItemId))
+                {
+                    wallpaper.Glass.Apply(update.Glass);
+                }
+                _needsPresent = true;
+                return new Ok();
+            case UpdateWater update:
+                if (!update.Water.IsValid)
+                {
+                    return new Failed("Water settings must be between 0 and 100%.");
+                }
+                foreach (var wallpaper in _wallpapers.Where(w => w.ItemId == update.LibraryItemId))
+                {
+                    wallpaper.Water.Apply(update.Water);
+                }
+                _needsPresent = true;
+                return new Ok();
             case UpdateRegions update:
-                if (update.Regions is null || !update.Regions.IsValid)
+                if (!EffectRules.IsValid(update.Effect, update.Regions))
                 {
                     return new Failed("Those regions aren't valid.");
                 }
                 foreach (var wallpaper in _wallpapers.Where(w => w.ItemId == update.LibraryItemId))
                 {
-                    wallpaper.Scene.SetRegions(EffectKind.Snow, update.Regions);
+                    wallpaper.Scene.SetRegions(update.Effect, update.Regions);
                 }
                 _needsPresent = true;
                 return new Ok();
@@ -325,7 +359,8 @@ public sealed class EngineHost
             })
             .ToList();
         var particles = _wallpapers.Sum(w => w.Scene.ActiveParticles);
-        return new EngineStatus(_paused, _diagnostics.Fps(_clock.Elapsed.TotalSeconds), privateBytes, cpu, particles, monitors, _settings, _problem);
+        return new EngineStatus(_paused, _diagnostics.Fps(_clock.Elapsed.TotalSeconds), privateBytes, cpu, particles, monitors, _settings, _problem,
+            ProtocolVersion: EngineProtocol.Current);
     }
 
     private bool OnRawMessage(uint msg, nuint wParam, nint lParam)
@@ -537,10 +572,23 @@ public sealed class EngineHost
         {
             var target = image.Monitor.Bounds.Size;
             scene = new WallpaperScene(_gpu, _background, image.Texture, image.Destination, image.ImageBounds);
-            var snow = new SnowEffect(_gpu, Seed(image.Monitor.Id));
+            var seed = Seed(image.Monitor.Id);
+            var snow = new SnowEffect(_gpu, seed);
             scene.Effects.Add(snow);
             snow.Apply(image.Item.Snow);
             scene.SetRegions(EffectKind.Snow, image.Item.Regions);
+            var rain = new RainEffect(_gpu, seed ^ 0x9e3779b9);
+            scene.Effects.Add(rain);
+            rain.Apply(image.Item.Rain.Settings);
+            scene.SetRegions(EffectKind.Rain, image.Item.Rain.Regions);
+            var glass = new GlassEffect(_gpu);
+            scene.Effects.Add(glass);
+            glass.Apply(image.Item.Glass.Settings);
+            scene.SetRegions(EffectKind.Glass, image.Item.Glass.Regions);
+            var water = new WaterEffect(_gpu);
+            scene.Effects.Add(water);
+            water.Apply(image.Item.Water.Settings);
+            scene.SetRegions(EffectKind.Water, image.Item.Water.Regions);
 
             window = WallpaperWindow.Create();
             DesktopHost.Attach(window.Handle, _plan, image.Monitor.Bounds);
@@ -549,7 +597,7 @@ public sealed class EngineHost
             scene.Update(new FrameTime(0, _clock.Elapsed.TotalSeconds), target);
             scene.Render(surface.BackBuffer, target);
             surface.Present(0);
-            _wallpapers.Add(new ActiveWallpaper(image.Monitor, image.Item.Id, window, surface, scene, snow));
+            _wallpapers.Add(new ActiveWallpaper(image.Monitor, image.Item.Id, window, surface, scene, snow, rain, glass, water));
             Log.Info("engine", $"event=shown monitor=\"{image.Monitor.DeviceName}\" size={target.Width}x{target.Height} flip={surface.UsesFlipModel}");
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
@@ -603,5 +651,6 @@ public sealed class EngineHost
 
     private sealed record PreparedImage(MonitorInfo Monitor, LibraryItem Item, ID3D11ShaderResourceView Texture, RectangleF Destination, RectangleF ImageBounds);
 
-    private sealed record ActiveWallpaper(MonitorInfo Monitor, Guid ItemId, WallpaperWindow Window, WallpaperSurface Surface, WallpaperScene Scene, SnowEffect Snow);
+    private sealed record ActiveWallpaper(MonitorInfo Monitor, Guid ItemId, WallpaperWindow Window, WallpaperSurface Surface, WallpaperScene Scene,
+        SnowEffect Snow, RainEffect Rain, GlassEffect Glass, WaterEffect Water);
 }
