@@ -51,9 +51,12 @@ public sealed class GlassEffect : IEffect
 
     public int ActiveParticles => 0;
 
-    public bool IsAnimated => Volatile.Read(ref _settings).Enabled;
+    public bool IsAnimated => IsDrawing;
 
-    public bool NeedsFrameCopy => Volatile.Read(ref _settings).Enabled;
+    public bool NeedsFrameCopy => IsDrawing;
+
+    /// <summary>Enabled with at least one usable pane; with none, the frame isn't copied for nothing.</summary>
+    private bool IsDrawing => Volatile.Read(ref _settings).Enabled && Volatile.Read(ref _paneCount) > 0;
 
     public void Apply(GlassSettings settings) => Volatile.Write(ref _settings, settings);
 
@@ -69,7 +72,7 @@ public sealed class GlassEffect : IEffect
             _panes[i].BoundsPx = Grow(_panes[i].BoundsPx, reach, targetPixels);
         }
         _gpu.Context.UpdateSubresource(_panes, _paneBuffer);
-        _paneCount = count;
+        Volatile.Write(ref _paneCount, count);
     }
 
     public void Update(in FrameTime time, Size targetPixels)
@@ -80,11 +83,12 @@ public sealed class GlassEffect : IEffect
     public void Render(ID3D11RenderTargetView target, Size targetPixels, in EffectInputs inputs)
     {
         var settings = Volatile.Read(ref _settings);
-        if (!settings.Enabled || _paneCount == 0 || inputs.Frame is not { } frame)
+        var paneCount = Volatile.Read(ref _paneCount);
+        if (!settings.Enabled || paneCount == 0 || inputs.Frame is not { } frame)
         {
             return;
         }
-        GlassFrameBuilder.BuildFrame(_timeSec, settings, targetPixels, _paneCount, ref _constants);
+        GlassFrameBuilder.BuildFrame(_timeSec, settings, targetPixels, paneCount, ref _constants);
         var context = _gpu.Context;
         context.UpdateSubresource(in _constants, _frameBuffer);
         context.OMSetRenderTargets(target);
@@ -101,7 +105,7 @@ public sealed class GlassEffect : IEffect
         context.PSSetShaderResource(0, frame);
         context.PSSetShaderResource(1, inputs.Mask);
         context.PSSetSampler(0, _sampler);
-        context.DrawInstanced(4, (uint)_paneCount, 0, 0);
+        context.DrawInstanced(4, (uint)paneCount, 0, 0);
     }
 
     public void Dispose()

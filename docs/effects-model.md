@@ -48,7 +48,7 @@ Rain uses the same stateless instancing as snow: hash randoms per instance, a la
 - With no panes, one pane covers the whole target.
 
 **Beads:** two jittered grids, one bead per cell.
-- Each cell's life lasts `cycles = max(1, round(P / lerp(25, 70, r1)))` cycles per period. A new hash is drawn per life (`floor(timePhase × cycles + r2)`), so beads reappear in new places.
+- Each cell's life lasts `cycles = max(1, round(P / lerp(25, 70, r1)))` cycles per period. A new hash is drawn per life (`floor(timePhase × cycles + r2) mod cycles`, so the hash doesn't jump when the period wraps), and beads reappear in new places.
 - Alpha over a life: `smoothstep(0, 0.04, lp) × smoothstep(1, 0.55, lp)`. The bead shrinks to 75 % as it evaporates.
 
 | Grid | Cell (px) | Radius (px) | Density |
@@ -59,7 +59,7 @@ Rain uses the same stateless instancing as snow: hash randoms per instance, a la
 The bead is placed so it stays inside its cell.
 
 **Sliding drops:** one column per `80 × sizeMul` px. Each pixel checks its own column and the two next to it.
-- **Timing:** each column runs `cycles = max(1, round(P / lerp(6, 16, r1)))` cycles per period, with a new hash per run. A run slides only if `r3 < sliding/100`.
+- **Timing:** each column runs `cycles = max(1, round(P / lerp(6, 16, r1)))` cycles per period, with a new hash per run (`floor(timePhase × cycles + r2) mod cycles`, as for beads). A run slides only if `r3 < sliding/100`.
 - **Path:**
   - The drop stays stuck until `start = lerp(0.25, 0.55, r4)` of the cycle.
   - Then `u` goes from 0 to 1, and `prog = u − sin(2π·hops·u) / (2π·hops) × 0.9`, with hops 3–7. That gives stop-start motion that never reverses.

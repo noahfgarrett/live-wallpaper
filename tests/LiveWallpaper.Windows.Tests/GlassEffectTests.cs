@@ -187,6 +187,7 @@ public sealed class GlassEffectTests
         WindowsOnly.Require();
         using var gpu = GpuDevice.Create(useWarp: true);
         using var effect = new GlassEffect(gpu);
+        effect.SetGeometry(RegionSet.Empty, FullFrame, Target);
 
         effect.Apply(Fogged);
         var enabled = (effect.NeedsFrameCopy, effect.IsAnimated, effect.ActiveParticles);
@@ -194,5 +195,19 @@ public sealed class GlassEffectTests
         var disabled = (effect.NeedsFrameCopy, effect.IsAnimated, effect.ActiveParticles);
 
         Assert.Equal(((true, true, 0), (false, false, 0)), (enabled, disabled));
+    }
+
+    [Fact]
+    public void Glass_NoUsablePanes_NeedsNoFrameCopy()
+    {
+        WindowsOnly.Require();
+        using var gpu = GpuDevice.Create(useWarp: true);
+        using var effect = new GlassEffect(gpu);
+        effect.Apply(Fogged);
+        var collinear = Quad((0.1, 0.1), (0.3, 0.3), (0.5, 0.5), (0.2, 0.2));
+
+        effect.SetGeometry(Panes(0, collinear), FullFrame, Target);
+
+        Assert.Equal((false, false), (effect.NeedsFrameCopy, effect.IsAnimated));
     }
 }

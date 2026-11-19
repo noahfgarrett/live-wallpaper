@@ -64,6 +64,13 @@ uint Cell(float2 c)
     return Hash(uint(int(c.x) + 32768) * 0x10001u ^ Hash(uint(int(c.y) + 32768)));
 }
 
+/// The index of the current life within the period, so the hash doesn't jump when timePhase wraps.
+/// t is never negative; integer modulo is exact where a float floor(v / m) could round just below a multiple.
+uint LifeIndex(float t, float cycles)
+{
+    return uint(floor(t)) % uint(cycles);
+}
+
 float3 Scene(float2 px, float lod)
 {
     return frameCopy.SampleLevel(linearClamp, px / resolution, lod).rgb;
@@ -104,11 +111,25 @@ float PaneDistance(GlassPane pane, float2 px)
         max(EdgeOutside(c2, c3, winding, px), EdgeOutside(c3, c0, winding, px)));
 }
 
-/// Bounding boxes can overlap other panes, so each pixel belongs to the pane it is deepest inside (lowest index on ties).
+bool IsInside(GlassPane pane, float2 px)
+{
+    float3 h = float3(px, 1.0);
+    float3 q = float3(dot(pane.inv0.xyz, h), dot(pane.inv1.xyz, h), dot(pane.inv2.xyz, h));
+    float2 uv = q.xy / max(q.z, MinDepth);
+    return q.z > MinDepth && all(uv >= 0.0) && all(uv <= 1.0);
+}
+
+/// Bounding boxes can overlap other panes, so each pixel belongs to one pane: the lowest-index pane it is inside,
+/// or, in the soft edges outside every pane, the nearest pane (lowest index on ties).
 bool OwnsPixel(uint index, float2 px)
 {
-    float mine = PaneDistance(panes[index], px);
     uint count = uint(paneCount);
+    if (count <= 1)
+    {
+        return true;
+    }
+    bool isInsideMine = IsInside(panes[index], px);
+    float mine = isInsideMine ? 0.0 : PaneDistance(panes[index], px);
     [loop]
     for (uint j = 0; j < MaxPanes; j++)
     {
@@ -117,6 +138,18 @@ bool OwnsPixel(uint index, float2 px)
             break;
         }
         if (j == index)
+        {
+            continue;
+        }
+        if (IsInside(panes[j], px))
+        {
+            if (!isInsideMine || j < index)
+            {
+                return false;
+            }
+            continue;
+        }
+        if (isInsideMine)
         {
             continue;
         }
@@ -148,7 +181,7 @@ void Beads(inout float4 best, inout float bestAlpha, float2 p, float cs, float r
     uint id = Cell(cell + salt * 131.0);
     float cycles = max(1.0, round(Period / lerp(25.0, 70.0, Rnd(id, 1u))));
     float t = timePhase * cycles + Rnd(id, 2u);
-    uint life = Hash(id ^ (uint(int(floor(t))) * 0x27d4eb2du));
+    uint life = Hash(id ^ (LifeIndex(t, cycles) * 0x27d4eb2du));
     float lp = frac(t);
     if (Rnd(life, 3u) > density)
     {
@@ -208,7 +241,7 @@ float4 PSMain(VSOut input) : SV_Target
         uint id = Cell(float2(col, 977.0));
         float cycles = max(1.0, round(Period / lerp(6.0, 16.0, Rnd(id, 1u))));
         float t = timePhase * cycles + Rnd(id, 2u);
-        uint run = Hash(id ^ (uint(int(floor(t))) * 0x165667b1u));
+        uint run = Hash(id ^ (LifeIndex(t, cycles) * 0x165667b1u));
         if (Rnd(run, 3u) > sliding)
         {
             continue;
