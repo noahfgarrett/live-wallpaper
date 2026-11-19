@@ -6,7 +6,7 @@ Live Wallpaper is a native Windows 10/11 app that turns a still photo into a liv
 
 ## Status
 
-**Early test builds (Milestones 2 + 3).** The app, live snow, tray icon and settings are built. Effect regions (snow only outside a window, for example) come next. Nothing is verified on a real desktop yet; see [the test checklist](docs/windows-test-checklist.md).
+**Early test builds (Milestone 4).** The app, live snow, effect regions, tray icon and settings are built. Automatic pausing comes next. Nothing is verified on a real desktop yet; see [the test checklist](docs/windows-test-checklist.md).
 
 ### Verified on Windows
 
@@ -21,6 +21,7 @@ Nothing yet. Each behaviour is listed here only after it has been checked on a r
 
 - **Library:** choose **Import images**, or drop photos onto the window. Each image is copied into the library; your original file is never changed or deleted.
 - **Edit:** opens the editor with a live preview. Turn snow on, then adjust density, speed, wind, flake size and motion blur. If the image is on your desktop, it changes there too.
+- **Regions:** in the editor, **Add region** and drag its corners onto part of the photo, such as the sky, so snow falls only there. Turn on **Snow everywhere except the regions** to keep snow off a window instead, and use **Soft edge** to blend the border. See [docs/regions.md](docs/regions.md).
 - **Apply:** pick all displays or one, and a scaling mode (Fill, Fit, Stretch, Center).
 - **Tray icon:** right-click it to open the app, pause or resume the animation, switch to a recent wallpaper, open settings, or exit.
 - **Settings:** start with Windows (off by default), keep the wallpaper running when the app is closed, frame rate (30, 60 or Adaptive) and default scaling.
@@ -61,7 +62,6 @@ The solution, WPF app included, also builds on macOS and Linux (`EnableWindowsTa
 
 - Relies on undocumented Explorer behaviour, which may change in future Windows updates.
 - No automatic pausing for fullscreen apps or battery saver yet (planned).
-- No effect regions yet (planned next).
 - Behaviour on real desktops is unverified until it appears in "Verified on Windows" above.
 
 ## License
