@@ -1,11 +1,13 @@
 using System.Text.Json.Serialization;
 using LiveWallpaper.Core.Models;
+using LiveWallpaper.Core.Regions;
 
 namespace LiveWallpaper.Core.Ipc;
 
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
 [JsonDerivedType(typeof(ApplyWallpaper), "apply")]
 [JsonDerivedType(typeof(UpdateSnow), "snow")]
+[JsonDerivedType(typeof(UpdateRegions), "regions")]
 [JsonDerivedType(typeof(SetPaused), "pause")]
 [JsonDerivedType(typeof(SetPreferences), "prefs")]
 [JsonDerivedType(typeof(GetStatus), "status")]
@@ -16,6 +18,8 @@ public abstract record EngineRequest;
 public sealed record ApplyWallpaper(Guid LibraryItemId, string MonitorSelector, WallpaperScaling Scaling) : EngineRequest;
 
 public sealed record UpdateSnow(Guid LibraryItemId, SnowSettings Snow) : EngineRequest;
+
+public sealed record UpdateRegions(Guid LibraryItemId, RegionSet Regions) : EngineRequest;
 
 public sealed record SetPaused(bool Paused) : EngineRequest;
 

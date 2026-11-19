@@ -55,6 +55,21 @@ public sealed record RegionSet(IReadOnlyList<Region> Regions, bool Invert = fals
 
     public static RegionSet Empty { get; } = new([]);
 
+    /// <summary>True when the set is safe to rasterize: within the limits, every point finite and inside the image.</summary>
+    public bool IsValid =>
+        Regions is not null
+        && Regions.Count <= MaxRegions
+        && double.IsFinite(FeatherPct)
+        && FeatherPct is >= 0 and <= MaxFeatherPct
+        && Regions.All(IsValidRegion);
+
+    private static bool IsValidRegion(Region? region) =>
+        region?.Points is { } points
+        && points.Count is >= RegionGeometry.MinPoints and <= MaxPoints
+        && points.All(p => InImage(p.X) && InImage(p.Y));
+
+    private static bool InImage(double value) => double.IsFinite(value) && value is >= 0 and <= 1;
+
     public bool Equals(RegionSet? other)
     {
         if (ReferenceEquals(this, other))

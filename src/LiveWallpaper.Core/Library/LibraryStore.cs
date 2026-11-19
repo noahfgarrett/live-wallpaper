@@ -160,7 +160,9 @@ public sealed class LibraryStore(string libraryDirectory, TimeProvider timeProvi
                 || item.FileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
                 || item.FileName.Contains("..", StringComparison.Ordinal)
                 || item.Snow is null
-                || !item.Snow.IsValid)
+                || !item.Snow.IsValid
+                || item.Regions is null
+                || !item.Regions.IsValid)
             {
                 throw new JsonException("The library contains an invalid item.");
             }

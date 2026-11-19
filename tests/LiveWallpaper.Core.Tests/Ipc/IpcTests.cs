@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text;
 using LiveWallpaper.Core.Ipc;
 using LiveWallpaper.Core.Models;
+using LiveWallpaper.Core.Regions;
 
 namespace LiveWallpaper.Core.Tests.Ipc;
 
@@ -13,6 +14,10 @@ public sealed class IpcTests
     [
         new ApplyWallpaper(Guid.NewGuid(), "all", WallpaperScaling.Fit),
         new UpdateSnow(Guid.NewGuid(), new SnowSettings(DensityPct: 75, MotionBlur: true)),
+        new UpdateRegions(Guid.NewGuid(), new RegionSet(
+            [RegionGeometry.CreateQuad(), new Region([new(0.1, 0.1), new(0.3, 0.1), new(0.2, 0.4)])],
+            Invert: true,
+            FeatherPct: 3.5)),
         new SetPaused(true),
         new SetPreferences(FrameRateMode.Adaptive, WallpaperScaling.Center, false),
         new GetStatus(),
