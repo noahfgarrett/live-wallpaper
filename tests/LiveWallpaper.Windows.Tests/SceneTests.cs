@@ -98,6 +98,42 @@ public sealed class SceneTests
     }
 
     [Fact]
+    public void FrameCopy_GeneratesMips()
+    {
+        WindowsOnly.Require();
+        using var gpu = GpuDevice.Create(useWarp: true);
+        using var background = new ImageQuadRenderer(gpu);
+        using var target = new OffscreenTarget(gpu, Target);
+        using var image = gpu.CreateImageTexture(OffscreenTarget.Solid(200, 120, 40));
+        background.Draw(target.View, Target, image, FullFrame);
+        using var copy = new FrameCopy(gpu);
+
+        var view = copy.Capture(target.View, Target);
+
+        Assert.Equal([200, 120, 40, 255], target.ReadBackSmallestMip(view));
+    }
+
+    [Fact]
+    public void FrameCopy_AnotherTarget_CopiesFromIt()
+    {
+        WindowsOnly.Require();
+        using var gpu = GpuDevice.Create(useWarp: true);
+        using var background = new ImageQuadRenderer(gpu);
+        using var first = new OffscreenTarget(gpu, Target);
+        using var second = new OffscreenTarget(gpu, Target);
+        using var red = gpu.CreateImageTexture(OffscreenTarget.Solid(0, 0, 255));
+        using var blue = gpu.CreateImageTexture(OffscreenTarget.Solid(255, 0, 0));
+        background.Draw(first.View, Target, red, FullFrame);
+        background.Draw(second.View, Target, blue, FullFrame);
+        using var copy = new FrameCopy(gpu);
+        copy.Capture(first.View, Target);
+
+        var view = copy.Capture(second.View, Target);
+
+        Assert.Equal(second.ReadBack(), second.ReadBack(view));
+    }
+
+    [Fact]
     public void Render_DrawsEffectsInFixedOrder()
     {
         WindowsOnly.Require();

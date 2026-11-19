@@ -7,6 +7,7 @@ namespace LiveWallpaper.Rendering;
 
 public sealed class WallpaperScene : IDisposable
 {
+    private const uint EffectInputSlots = 4;
     private static readonly EffectKind[] s_drawSequence = [.. Enum.GetValues<EffectKind>().OrderBy(DrawOrder)];
 
     private readonly GpuDevice _gpu;
@@ -121,6 +122,7 @@ public sealed class WallpaperScene : IDisposable
                 effect.Render(target, targetPixels, new EffectInputs(mask.View, _image, _destination, effect.NeedsFrameCopy ? frame : null));
             }
         }
+        _gpu.Context.PSUnsetShaderResources(0, EffectInputSlots);
         if (frame is null)
         {
             _frameCopy.Release();

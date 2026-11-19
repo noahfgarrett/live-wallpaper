@@ -26,29 +26,47 @@ internal sealed unsafe class OffscreenTarget : IDisposable
 
     public ID3D11RenderTargetView View { get; }
 
-    public byte[] ReadBack() => ReadMip0(_texture);
+    public byte[] ReadBack() => ReadMip(_texture, 0);
 
-    /// <summary>Reads mip 0 of the texture behind <paramref name="view"/>, which must be target-sized B8G8R8A8.</summary>
+    /// <summary>Reads mip 0 of the texture behind <paramref name="view"/>.</summary>
     public byte[] ReadBack(ID3D11ShaderResourceView view)
     {
         using var resource = view.Resource;
         using var texture = resource.QueryInterface<ID3D11Texture2D>();
-        return ReadMip0(texture);
+        return ReadMip(texture, 0);
     }
 
-    private byte[] ReadMip0(ID3D11Texture2D source)
+    /// <summary>Reads the smallest mip of the texture behind <paramref name="view"/>.</summary>
+    public byte[] ReadBackSmallestMip(ID3D11ShaderResourceView view)
     {
-        var stagingDesc = _desc with { BindFlags = BindFlags.None, Usage = ResourceUsage.Staging, CPUAccessFlags = CpuAccessFlags.Read };
+        using var resource = view.Resource;
+        using var texture = resource.QueryInterface<ID3D11Texture2D>();
+        return ReadMip(texture, texture.Description.MipLevels - 1);
+    }
+
+    private byte[] ReadMip(ID3D11Texture2D source, uint mip)
+    {
+        var desc = source.Description;
+        var width = (int)Math.Max(1, desc.Width >> (int)mip);
+        var height = (int)Math.Max(1, desc.Height >> (int)mip);
+        var stagingDesc = _desc with
+        {
+            Width = (uint)width,
+            Height = (uint)height,
+            BindFlags = BindFlags.None,
+            Usage = ResourceUsage.Staging,
+            CPUAccessFlags = CpuAccessFlags.Read,
+        };
         using var staging = _gpu.Device.CreateTexture2D(stagingDesc);
-        _gpu.Context.CopySubresourceRegion(staging, 0, 0, 0, 0, source, 0);
+        _gpu.Context.CopySubresourceRegion(staging, 0, 0, 0, 0, source, mip);
         var mapped = _gpu.Context.Map(staging, 0, MapMode.Read);
         try
         {
-            var result = new byte[Size.Width * Size.Height * 4];
-            for (var y = 0; y < Size.Height; y++)
+            var result = new byte[width * height * 4];
+            for (var y = 0; y < height; y++)
             {
-                new ReadOnlySpan<byte>((byte*)mapped.DataPointer + (y * mapped.RowPitch), Size.Width * 4)
-                    .CopyTo(result.AsSpan(y * Size.Width * 4));
+                new ReadOnlySpan<byte>((byte*)mapped.DataPointer + (y * mapped.RowPitch), width * 4)
+                    .CopyTo(result.AsSpan(y * width * 4));
             }
             return result;
         }
