@@ -59,6 +59,30 @@ public sealed class RegionOverlayRendererTests
     }
 
     [Fact]
+    public void Arrow_DrawsBlueAlongTheShaft()
+    {
+        WindowsOnly.Require();
+
+        var pixels = Draw(new OverlayShape(OverlayShapeKind.Arrow, new RegionPoint(0.2, 0.5), new RegionPoint(0.8, 0.5)));
+
+        var middle = ((50 * Target.Width) + 50) * 4;
+        Assert.True(pixels[middle] > pixels[middle + 2] + 50); // BGRA: blue well above red
+        Assert.True(Brightness(pixels, 50, 50) > 400);
+        Assert.Equal(0, Brightness(pixels, 50, 30));
+    }
+
+    [Fact]
+    public void Arrow_DrawsItsHeadAtB()
+    {
+        WindowsOnly.Require();
+
+        var pixels = Draw(new OverlayShape(OverlayShapeKind.Arrow, new RegionPoint(0.2, 0.5), new RegionPoint(0.8, 0.5)));
+
+        Assert.True(Brightness(pixels, 72, 52) > 300); // inside the head, off the shaft
+        Assert.Equal(0, Brightness(pixels, 85, 50));   // beyond the tip
+    }
+
+    [Fact]
     public void NoShapes_LeavesTargetUntouched()
     {
         WindowsOnly.Require();
