@@ -11,6 +11,8 @@
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="..\..\src\LiveWallpaper.Windows\LiveWallpaper.Windows.csproj" />
+        <ProjectReference Include="..\..\src\LiveWallpaper.Media\LiveWallpaper.Media.csproj" />
+        <ProjectReference Include="..\..\src\LiveWallpaper.Rendering\LiveWallpaper.Rendering.csproj" />
     </ItemGroup>
     <ItemGroup>
         <Using Include="Xunit" />
