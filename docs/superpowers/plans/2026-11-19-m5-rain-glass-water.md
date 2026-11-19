@@ -26,7 +26,7 @@
 - **Defaults:**
   - Rain: off, density 50, speed 50, wind 20, length 50, brightness 50.
   - Glass: off, drops 50, drop size 50, sliding 40, fog 30.
-  - Water: off, stretch 50, foam 30.
+  - Water: off, stretch 50, foam 30, mist 40 (MistPct, added after the user tried the spike; Task 5 adds it to `WaterSettings`).
   - Snow keeps `Enabled = true`.
 - **Draw order:** background → water → rain → snow → glass.
 - **Region limits:** 16 regions and 64 points per region, as today. A glass pane has exactly 4 points. A water region has a Flow with finite components and a length (normalized, no aspect correction) of 0.002–1. The editor clamps the aspect-corrected arrow length to 0.02–0.5. The default arrow is (0, 0.12).
@@ -206,6 +206,12 @@
 - `[StructLayout(Sequential)] struct WaterFrameConstants`: `Vector4 ImageDest; Vector2 Resolution; float Phase; float Cycle; float Foam; float Scale; Vector2 Padding;`.
 - `static class WaterFrameBuilder`: `void Build(double phase, WaterSettings settings, RectangleF imageDestination, Size target, ref WaterFrameConstants result)`.
 
+- **Mist amendment (user request):**
+  - Add `double MistPct = 40` as the last parameter of `WaterSettings`, included in `IsValid`. A file without it loads as 40.
+  - Add `WaterModel.MistReachPx(double mistPct, double displayedImageHeightPx) => (0.04 + 0.10 × pct/100) × h` and `WaterModel.MaxMistReachFraction = 0.14`.
+  - `FlowField.Build` gains a `double dilatePx` parameter. Pixels outside every region but within `dilatePx` (in target pixels; work at the 1/4 grid) of a region take the flow of the nearest region (two-pass chamfer or BFS distance transform), so the mist plume knows its direction. Callers pass `MaxMistReachFraction × imageBounds.Height`.
+  - `WaterFrameConstants` gains `float Mist; float MistReach;`, keeping 16-byte alignment.
+  - Tests: `WaterSettings_MissingMist_LoadsAs40`, `FlowField_DilatesNearestRegionFlow_WithinReach`, `FlowField_BeyondReach_IsZero`, `MistReach_MatchesModel`.
 - [ ] **Step 1: Write the failing tests**
   - `SpeedPxPerSec_DefaultArrowOnSquareImage`: flow (0, 0.12) and 1000×1000 px give (0, 30).
   - `SpeedPxPerSec_SameScreenLengthSameSpeed`: on a 2:1 image, a horizontal arrow (0.06, 0) and a vertical arrow (0, 0.12) give equal speeds.
@@ -333,6 +339,7 @@
   - The flow texture is sampled at `px / resolution` (it covers the target).
   - The flow passed in is in px/s. Multiply it by `Cycle` in the shader.
   - The mask is sampled at the sample points `a` and `b`, as well as at `px`.
+  - Mist: port the Mist block from `docs/effects-model.md` (Water → Mist), with premultiplied output and a discard when there is neither water nor mist. Add the test `Water_Mist_BrightensBelowTheRegion_OnlyWhenMistOn`: with flow down and mist 100, pixels just below the region are brighter than the background; with mist 0 they are equal.
 - [ ] **Step 4:** Build. Expected: 0 warnings.
 - [ ] **Step 5:** Commit `feat(rendering): flowing water`.
 
@@ -427,7 +434,7 @@
 - **Sliders:**
   - Rain: Density, Speed, Wind, Streak length, Brightness.
   - Glass: Drops, Drop size, Sliding, Fog.
-  - Water: Stretch, Foam.
+  - Water: Stretch, Foam, Mist.
 - **Behaviour:**
   - A tab switch cancels any drag (`SetEnabled(false)` then `true` on the old editor) and redraws the overlay from the new editor.
   - Ctrl+Z and Ctrl+Y act on the active editor.

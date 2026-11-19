@@ -8,7 +8,7 @@ The source for the Milestone 5 shaders, in the style of `docs/snow-model.md`. Th
 |---|---|---|
 | Rain | on, density, speed, wind, length, brightness | off, 50, 50, 20, 50, 50 |
 | Glass | on, drops, drop size, sliding, fog | off, 50, 50, 40, 30 |
-| Water | on, stretch, foam | off, 50, 30 |
+| Water | on, stretch, foam, mist | off, 50, 30, 40 |
 
 ## Rain
 
@@ -107,3 +107,14 @@ The bead is placed so it stays inside its cell.
 - **Blend:** `(colour × m, m)`, premultiplied over the background, where m is the water mask at `px`.
 
 **Noise:** value noise over the integer-hashed lattice (`Hash(x + 32768) × 0x10001 ^ Hash(y + 32768)`), smoothstep-interpolated. The inputs are screen pixels divided by fixed scales, so they stay small for any running time.
+
+**Mist** (`mist` = MistPct / 100):
+- `reach = (0.04 + 0.10 × mist) × displayed image height`.
+- **Plume:** for k = 1..6, with f = k/6 and `up = px − dir × reach × f`: `plume = max(plume, max(mask(up), mask(up ± perp × reach × f × 0.45)) × (1 − 0.8 f))`.
+- **Base:** `base = plume × (1 − mask(px + dir × reach × 0.3))`.
+- **Haze:** a two-phase cross-fade (`mp0 = fract(phase × 0.5 + 0.13)`) of `0.6 × Noise((s + (0, 38·mp) + dir·20·mp) / 46) + 0.4 × Noise((s + (0, 38·mp)) / 17)`, where `s = px / scale`.
+- **Opacity:** `mistA = mist × smoothstep(0, 0.85, base) × (0.35 + 0.65 × haze) × 0.8`.
+- **Colour:** `lerp((0.9, 0.93, 0.97), photo × 0.5 + 0.55, 0.3)`.
+- **Output, premultiplied:** `rgb = water × m × (1 − mistA) + mistColour × mistA`, `a = m × (1 − mistA) + mistA`.
+- **Discard** when `m < 0.002 && mistA < 0.004`.
+- `dir` comes from the flow texture, which is dilated outside the regions to the nearest region's flow, up to 0.14 × the displayed image height.

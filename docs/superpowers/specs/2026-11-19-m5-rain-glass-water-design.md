@@ -28,7 +28,6 @@ Success: a photo of a waterfall that visibly flows on the desktop, and a photo o
 
 **Non-goals (this milestone)**
 - Splashes on the ground. They look fake without knowing where the ground is.
-- Mist or spray at the base of a waterfall. It could be a later effect.
 - Direction strokes or curved flow inside a single water region. A bend takes two or three regions.
 - Two instances of the same effect on one image (approach B, section 4).
 - Low-power mode. It doesn't exist yet (Milestone 5 "Robustness" in the original plan).
@@ -92,7 +91,7 @@ Settings (percentages unless noted). The defaults are starting points, to be tun
 |---|---|
 | `RainSettings` | Enabled (false), DensityPct (50), SpeedPct (50), WindPct (20), LengthPct (50), BrightnessPct (50) |
 | `GlassSettings` | Enabled (false), DropsPct (50), DropSizePct (50), SlidingPct (40), FogPct (30) |
-| `WaterSettings` | Enabled (false), StretchPct (50), FoamPct (30) |
+| `WaterSettings` | Enabled (false), StretchPct (50), FoamPct (30), MistPct (40) |
 
 Snow's `Enabled` default stays true, so imports keep today's behaviour.
 
@@ -189,6 +188,13 @@ Rain uses the snow machinery, with the same stateless instancing, the same perio
   - The phase is integrated on the CPU like `FallClock` (`phase = frac(phase + dt / C)`, in double precision). A slider change alters the rate, never the position.
 - **Foam:** a scrolling, flow-aligned streak noise (generated in the shader, no texture), weighted by the photo's own brightness, so white water gets churning highlights and dark water stays calm. `FoamPct` scales it.
 - The result is blended over the background by the water mask, so the edges are soft.
+- **Mist (added 2026-11-19 at the user's request** after trying the spike: "there needs to be a slider at the base to make it mist out so you don't get the hard lines"). A drifting spray plume forms where water leaves its region, downstream along the flow.
+  - **Where it forms:** a pixel gets mist when there is water upstream of it within reach and no water just downstream of it. "Upstream" means 6 samples of the water mask back along the local flow direction, spreading sideways by 45 % of the distance. "No water just downstream" means the mask at `px + dir × 0.3 × reach`. Together they find the base of the fall.
+  - **Reach:** `(0.04 + 0.10 × mist) × displayed image height`.
+  - **Movement:** the haze is two octaves of value noise rising upward, using the bounded two-phase cross-fade.
+  - **Blending:** water is premultiplied first, then the mist is composited over it, so letterbox bars stay correct.
+  - **The flow texture also covers the plume:** pixels outside every water region get the flow of the nearest region, up to the maximum reach (0.14 × displayed image height). The plume then knows its direction without depending on the slider, so a slider change never rebuilds the texture.
+  - **The pass covers the plume area too.** Pixels with no water and no mist are discarded.
 
 ### 5.7 Precision rules (binding; from `docs/snow-model.md`)
 
@@ -206,6 +212,7 @@ Rain uses the snow machinery, with the same stateless instancing, the same perio
 │   photo with all effects running,    │ │ Water                  (on)  │
 │   outlines + handles + arrows for    │ │ Stretch           ───●── 50% │
 │   the open tab's regions only        │ │ Foam              ──●─── 30% │
+│ Mist              ──●─── 40% │
 │                                      │ │ Regions                      │
 │                                      │ │ [Add water region] [Delete]  │
 └──────────────────────────────────────┘ │ Soft edge  ● Show outlines   │
