@@ -64,6 +64,13 @@ internal static unsafe partial class User32
     public static partial nint GetParent(nint hWnd);
 
     [LibraryImport("user32.dll")]
+    public static partial nint SetCapture(nint hWnd);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool ReleaseCapture();
+
+    [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool IsWindow(nint hWnd);
 

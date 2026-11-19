@@ -2,6 +2,7 @@ using System.Diagnostics;
 using LiveWallpaper.Core.Diagnostics;
 using LiveWallpaper.Core.Geometry;
 using LiveWallpaper.Core.Models;
+using LiveWallpaper.Core.Regions;
 using LiveWallpaper.Media;
 using LiveWallpaper.Rendering;
 using SharpGen.Runtime;
@@ -25,6 +26,8 @@ public sealed class PreviewRenderer : IDisposable
     private (string Path, WallpaperScaling Scaling)? _image;
     private int _imageVersion;
     private SnowSettings _snow = new();
+    private RegionSet _regions = RegionSet.Empty;
+    private OverlayFrame _overlay = new([], 1f);
     private volatile bool _thirtyFps;
 
     public PreviewRenderer(nint window, Size size)
@@ -58,6 +61,11 @@ public sealed class PreviewRenderer : IDisposable
 
     public void SetSnow(SnowSettings settings) => Volatile.Write(ref _snow, settings);
 
+    public void SetRegions(RegionSet regions) => Volatile.Write(ref _regions, regions);
+
+    /// <summary>The editor's outlines and handles, in image coordinates; drawn over the scene with the scene's own image rectangle.</summary>
+    public void SetOverlay(IReadOnlyList<OverlayShape> shapes, float scale) => Volatile.Write(ref _overlay, new OverlayFrame(shapes, scale));
+
     public void SetFrameRate(FrameRateMode mode) => _thirtyFps = mode == FrameRateMode.Fps30;
 
     public void Dispose()
@@ -72,6 +80,7 @@ public sealed class PreviewRenderer : IDisposable
         {
             using var gpu = CreateGpu();
             using var background = new ImageQuadRenderer(gpu);
+            using var overlay = new RegionOverlayRenderer(gpu);
             WallpaperSurface? surface = null;
             WallpaperScene? scene = null;
             SnowEffect? snow = null;
@@ -133,8 +142,11 @@ public sealed class PreviewRenderer : IDisposable
                     if (scene is not null && snow is not null)
                     {
                         snow.Apply(Volatile.Read(ref _snow));
+                        scene.SetRegions(Volatile.Read(ref _regions));
                         scene.Update(new FrameTime(dt, now), size);
                         scene.Render(surface.BackBuffer, size);
+                        var frame = Volatile.Read(ref _overlay);
+                        overlay.Draw(surface.BackBuffer, size, scene.ImageBounds, frame.Shapes, frame.Scale);
                     }
                     else
                     {
@@ -170,6 +182,8 @@ public sealed class PreviewRenderer : IDisposable
         scene.Effects.Add(snow);
         return (scene, snow);
     }
+
+    private sealed record OverlayFrame(IReadOnlyList<OverlayShape> Shapes, float Scale);
 
     private static GpuDevice CreateGpu()
     {

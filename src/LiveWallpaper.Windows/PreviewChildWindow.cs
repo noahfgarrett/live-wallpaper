@@ -53,6 +53,11 @@ public sealed unsafe class PreviewChildWindow : IDisposable
         return new PreviewChildWindow(handle);
     }
 
+    /// <summary>Keeps sending mouse messages to this window while a button is held, even outside it.</summary>
+    public void CaptureMouse() => User32.SetCapture(Handle);
+
+    public static void ReleaseMouse() => User32.ReleaseCapture();
+
     public void Dispose()
     {
         if (User32.IsWindow(Handle))
