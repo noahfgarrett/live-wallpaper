@@ -6,7 +6,7 @@ namespace LiveWallpaper.Windows.Tests;
 
 public sealed class SnowEffectTests
 {
-    private static readonly Size Target = new(256, 144);
+    private static readonly Size Target = new(1920, 1080);
 
     private static byte[] Render(SnowSettings? snow, uint seed = 7, int frames = 30)
     {
@@ -27,6 +27,9 @@ public sealed class SnowEffectTests
         scene.Render(target.View, Target);
         return target.ReadBack();
     }
+
+    private static int BrighterPixels(byte[] pixels, byte[] background) =>
+        (int)Math.Round(BrighterFraction(pixels, background) * (pixels.Length / 4));
 
     private static double BrighterFraction(byte[] pixels, byte[] background)
     {
@@ -64,9 +67,11 @@ public sealed class SnowEffectTests
     {
         WindowsOnly.Require();
 
-        var fraction = BrighterFraction(Render(new SnowSettings(DensityPct: 100, SizePct: 100)), Render(null));
+        var background = Render(null);
+        var snow = Render(new SnowSettings(DensityPct: 100, SizePct: 100));
 
-        Assert.InRange(fraction, 0.01, 0.60);
+        Assert.True(BrighterPixels(snow, background) >= 2000, $"only {BrighterPixels(snow, background)} pixels brightened");
+        Assert.True(BrighterFraction(snow, background) <= 0.60);
     }
 
     [Fact]
@@ -74,7 +79,9 @@ public sealed class SnowEffectTests
     {
         WindowsOnly.Require();
 
-        Assert.True(BrighterFraction(Render(new SnowSettings(DensityPct: 100, SizePct: 100, MotionBlur: true)), Render(null)) > 0.005);
+        var brightened = BrighterPixels(Render(new SnowSettings(DensityPct: 100, SizePct: 100, MotionBlur: true)), Render(null));
+
+        Assert.True(brightened >= 1000, $"only {brightened} pixels brightened");
     }
 
     [Fact]
