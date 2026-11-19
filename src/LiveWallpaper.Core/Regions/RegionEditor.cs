@@ -176,7 +176,7 @@ public sealed class RegionEditor
                 Raise();
                 return;
             case Drag.Arrow arrow:
-                var head = view.ToImage(screen);
+                var head = view.VisibleBounds.Clamp(view.ToImage(screen));
                 _working = MapRegion(arrow.Region, r =>
                 {
                     var centroid = Centroid(r);

@@ -403,6 +403,18 @@ public sealed class RegionEditorTests
     }
 
     [Fact]
+    public void Flow_ArrowDrag_StaysOnVisibleImage()
+    {
+        var editor = EditorWithQuad(CroppedView, RegionEditMode.Flow);
+
+        // Centroid (0.5, 0.5); the head starts at image (0.5, 0.62), screen (500, 620). Screen x 1100 is image x 0.8, past the visible 0.75.
+        Drag(editor, new(500, 620), new RegionPoint(1100, 620));
+
+        var flow = editor.State.Regions[0].Flow ?? default;
+        AssertPoint(new RegionPoint(0.75, 0.62), new RegionPoint(0.5 + flow.X, 0.5 + flow.Y));
+    }
+
+    [Fact]
     public void Flow_HeadOnCorner_DragsArrow()
     {
         var corner = new RegionPoint(0.35, 0.35);
