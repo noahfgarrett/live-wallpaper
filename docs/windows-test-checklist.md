@@ -108,3 +108,59 @@ Start fresh: run `LiveWallpaper.Engine.exe --stop` from an older build if one is
 15. **Resources.** With snow on all three displays at the default settings for 5 minutes, open the Performance page.
     - Expected: note the frame rate, engine memory and engine CPU. The targets are roughly 60 fps, under 150 MB and a few percent CPU.
     - Result:
+
+## Milestone 4: effect regions
+
+Use the v0.3.1-m4 zip. Pick a photo with a window or a clear sky, and open it in the editor.
+
+0. **Upgrade over a running older engine.** Start an older build's engine (for example `LiveWallpaper.Engine.exe` from v0.1.0-m1 or v0.2.0-m3) and leave it running. Then, without stopping it, open **LiveWallpaper.exe** from the new zip.
+   - Expected: within about 10 seconds the status line turns green and the old engine is gone from Task Manager (one `LiveWallpaper.Engine` process remains, from the new folder). Applying an image works. You never see "The wallpaper engine couldn't be started."
+   - Result:
+1. **Old library.** Before anything else, check the library from v0.2.0-m3.
+   - Expected: every image is still there with its snow settings. Nothing was reset.
+   - Result:
+2. **Add a region.** Click **Add region**.
+   - Expected: a 4-corner outline with round handles appears in the middle of the preview, and snow now falls only inside it.
+   - Result:
+3. **Keystone.** Drag each corner onto the corners of a window or the sky.
+   - Expected: only the dragged corner moves, the shape follows like a projector keystone, and the handles stay exactly under the mouse.
+   - Result:
+4. **Invert.** Turn on **Snow everywhere except the regions**.
+   - Expected: snow falls everywhere except inside the outline.
+   - Result:
+5. **Soft edge.** Move **Soft edge** from 0 to 10%.
+   - Expected: at 0% the snow stops at a sharp line, and higher values fade it more and more gradually across the outline.
+   - Result:
+6. **Add and remove corners.** Hover an edge of the selected region until a dot appears, click and drag it. Then right-click a corner. Then click a corner and press Delete. Try to go below 3 corners.
+   - Expected: a corner is added where you clicked, right-click and Delete each remove one, and a triangle can't lose another corner.
+   - Result:
+7. **Move and limits.** Set scaling to **Fill** on a photo of a different shape than your screen, drag the region body far past the edge of the preview, then drag a corner outside the preview.
+   - Expected: the region stops at the edge of the visible picture, and the corner stops at the edge. Nothing ends up out of sight.
+   - Result:
+8. **Several regions.** Add a second region overlapping the first.
+   - Expected: snow falls in both, including where they overlap.
+   - Result:
+9. **Undo and redo.** Make three changes (a drag, invert, a soft-edge change), then press **Undo** three times and **Redo** three times, and try Ctrl+Z, Ctrl+Y and Ctrl+Shift+Z. Then start dragging a corner and press Ctrl+Z before releasing.
+   - Expected: each step undoes one whole change (one per drag), no handle stays selected after undo or redo, and Ctrl+Z mid-drag puts the corner back and stops the drag.
+   - Result:
+10. **Hide outlines.** Turn off **Show outlines**, then click and drag on the preview.
+    - Expected: no outlines or handles, and nothing changes when you click or drag. **Add region** turns the outlines back on.
+    - Result:
+11. **Scaling.** Switch scaling between Fill, Fit, Stretch and Center.
+    - Expected: the regions stay on the same part of the photo in every mode.
+    - Result:
+12. **Apply.** **Apply to desktop → All displays**.
+    - Expected: on every display, snow follows the regions exactly as in the preview, on the same part of the photo even on a display with a different shape.
+    - Result:
+13. **Live drag.** With the image applied, drag a corner and move **Soft edge** to 10% while watching the desktop. Repeat with **Soft edge** at 0% and at 0.1%, ideally on a 4K display.
+    - Expected: the desktop follows within a moment and the snow keeps falling smoothly at every soft edge, with no long freezes.
+    - Result:
+14. **Saved.** Close the app, reopen it and edit the same image. Then choose tray → **Exit**, start the app again and look at the desktop.
+    - Expected: the regions, invert and soft edge are all as you left them, both in the editor and on the desktop.
+    - Result:
+15. **High DPI.** Set a display to 150% scaling, move the app there and edit regions.
+    - Expected: the handles are a comfortable size and sit exactly under the mouse.
+    - Result:
+16. **Resources.** With regions on all three displays for 5 minutes, open the Performance page.
+    - Expected: note the frame rate, engine memory and CPU. They should be close to the Milestone 2 + 3 readings.
+    - Result:

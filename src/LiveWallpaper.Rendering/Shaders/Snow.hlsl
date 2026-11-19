@@ -23,6 +23,7 @@ cbuffer Layers : register(b1)
 };
 
 Texture2D atlas : register(t0);
+Texture2D regionMask : register(t1);
 SamplerState linearClamp : register(s0);
 
 static const float TwoPi = 6.2831853;
@@ -118,6 +119,7 @@ float4 PSMain(VSOut input) : SV_Target
     float2 d = input.uv * 2.0 - 1.0;
     float blob = exp(-dot(d, d) * 3.2) * (1.0 - smoothstep(0.85, 1.0, length(d)));
     float shape = lerp(sprite, blob, input.softness);
-    float a = shape * input.alpha;
+    float mask = regionMask.Sample(linearClamp, input.position.xy / resolution).r;
+    float a = shape * input.alpha * mask;
     return float4(float3(0.95, 0.975, 1.0) * a, a);
 }

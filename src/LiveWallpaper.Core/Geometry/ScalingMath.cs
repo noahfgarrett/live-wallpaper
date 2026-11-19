@@ -24,6 +24,22 @@ public static class ScalingMath
         };
     }
 
+    /// <summary>
+    /// Where the image lands on <paramref name="target"/> when it shows a scaled-down copy of <paramref name="reference"/>,
+    /// such as the editor preview of a monitor. Differs from <see cref="ComputeDestination"/> only for Center, which
+    /// depends on the real pixel size.
+    /// </summary>
+    public static RectangleF ComputeScaledDestination(Size image, Size reference, Size target, WallpaperScaling scaling)
+    {
+        RequirePositive(reference, nameof(reference));
+        RequirePositive(target, nameof(target));
+
+        var onReference = ComputeDestination(image, reference, scaling);
+        var sx = (float)target.Width / reference.Width;
+        var sy = (float)target.Height / reference.Height;
+        return new RectangleF(onReference.X * sx, onReference.Y * sy, onReference.Width * sx, onReference.Height * sy);
+    }
+
     public static Size ComputeDecodeSize(Size image, Size target, WallpaperScaling scaling)
     {
         RequirePositive(image, nameof(image));

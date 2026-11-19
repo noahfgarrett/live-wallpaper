@@ -77,7 +77,7 @@ public sealed unsafe class SnowEffect : IEffect
         _constants.FlakeCount = _count;
     }
 
-    public void Render(ID3D11RenderTargetView target, Size targetPixels)
+    public void Render(ID3D11RenderTargetView target, Size targetPixels, ID3D11ShaderResourceView mask)
     {
         if (_count == 0 || !Volatile.Read(ref _settings).Enabled)
         {
@@ -94,7 +94,9 @@ public sealed unsafe class SnowEffect : IEffect
         context.VSSetConstantBuffer(0, _frameBuffer);
         context.VSSetConstantBuffer(1, _layerBuffer);
         context.PSSetShader(_pixelShader);
+        context.PSSetConstantBuffer(0, _frameBuffer);
         context.PSSetShaderResource(0, _atlas);
+        context.PSSetShaderResource(1, mask);
         context.PSSetSampler(0, _sampler);
         context.DrawInstanced(4, (uint)_count, 0, 0);
     }

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using LiveWallpaper.Core.Diagnostics;
 using LiveWallpaper.Core.Geometry;
 using LiveWallpaper.Core.Models;
+using LiveWallpaper.Core.Regions;
 using LiveWallpaper.Media;
 using LiveWallpaper.Rendering;
 using SharpGen.Runtime;
@@ -22,9 +23,11 @@ public sealed class PreviewRenderer : IDisposable
     private volatile bool _stop;
     private Size _size;
     private long _sizeChangedAt;
-    private (string Path, WallpaperScaling Scaling)? _image;
+    private (string Path, WallpaperScaling Scaling, Size Reference)? _image;
     private int _imageVersion;
     private SnowSettings _snow = new();
+    private RegionSet _regions = RegionSet.Empty;
+    private OverlayFrame _overlay = new([], 1f);
     private volatile bool _thirtyFps;
 
     public PreviewRenderer(nint window, Size size)
@@ -47,16 +50,24 @@ public sealed class PreviewRenderer : IDisposable
         }
     }
 
-    public void SetImage(string path, WallpaperScaling scaling)
+    /// <param name="path">The image file.</param>
+    /// <param name="scaling">How it is scaled.</param>
+    /// <param name="reference">The monitor the preview stands for. Center scaling crops at its size, so the preview shows what the desktop will.</param>
+    public void SetImage(string path, WallpaperScaling scaling, Size reference)
     {
         lock (_gate)
         {
-            _image = (path, scaling);
+            _image = (path, scaling, reference);
             _imageVersion++;
         }
     }
 
     public void SetSnow(SnowSettings settings) => Volatile.Write(ref _snow, settings);
+
+    public void SetRegions(RegionSet regions) => Volatile.Write(ref _regions, regions);
+
+    /// <summary>The editor's outlines and handles, in image coordinates; drawn over the scene with the scene's own image rectangle.</summary>
+    public void SetOverlay(IReadOnlyList<OverlayShape> shapes, float scale) => Volatile.Write(ref _overlay, new OverlayFrame(shapes, scale));
 
     public void SetFrameRate(FrameRateMode mode) => _thirtyFps = mode == FrameRateMode.Fps30;
 
@@ -72,6 +83,7 @@ public sealed class PreviewRenderer : IDisposable
         {
             using var gpu = CreateGpu();
             using var background = new ImageQuadRenderer(gpu);
+            using var overlay = new RegionOverlayRenderer(gpu);
             WallpaperSurface? surface = null;
             WallpaperScene? scene = null;
             SnowEffect? snow = null;
@@ -85,7 +97,7 @@ public sealed class PreviewRenderer : IDisposable
                 {
                     Size size;
                     long changedAt;
-                    (string Path, WallpaperScaling Scaling)? image;
+                    (string Path, WallpaperScaling Scaling, Size Reference)? image;
                     int version;
                     lock (_gate)
                     {
@@ -117,7 +129,7 @@ public sealed class PreviewRenderer : IDisposable
                         snow = null;
                         try
                         {
-                            (scene, snow) = BuildScene(gpu, background, wanted.Path, wanted.Scaling, size);
+                            (scene, snow) = BuildScene(gpu, background, wanted.Path, wanted.Scaling, wanted.Reference, size);
                         }
                         catch (Exception ex) when (ex is not OutOfMemoryException)
                         {
@@ -133,8 +145,11 @@ public sealed class PreviewRenderer : IDisposable
                     if (scene is not null && snow is not null)
                     {
                         snow.Apply(Volatile.Read(ref _snow));
+                        scene.SetRegions(Volatile.Read(ref _regions));
                         scene.Update(new FrameTime(dt, now), size);
                         scene.Render(surface.BackBuffer, size);
+                        var frame = Volatile.Read(ref _overlay);
+                        overlay.Draw(surface.BackBuffer, size, scene.ImageBounds, frame.Shapes, frame.Scale);
                     }
                     else
                     {
@@ -158,16 +173,25 @@ public sealed class PreviewRenderer : IDisposable
         }
     }
 
-    private static (WallpaperScene Scene, SnowEffect Snow) BuildScene(GpuDevice gpu, ImageQuadRenderer background, string path, WallpaperScaling scaling, Size target)
+    /// <summary>Builds the scene as the reference monitor would show it, scaled down to the preview.</summary>
+    private static (WallpaperScene Scene, SnowEffect Snow) BuildScene(GpuDevice gpu, ImageQuadRenderer background, string path, WallpaperScaling scaling, Size reference, Size target)
     {
         var imageSize = WicImageLoader.ReadSize(path);
-        var crop = ScalingMath.ComputeSourceCrop(imageSize, target, scaling);
-        var decoded = WicImageLoader.Load(path, crop, ScalingMath.ComputeDecodeSize(imageSize, target, scaling));
-        var scene = new WallpaperScene(background, gpu.CreateImageTexture(decoded), ScalingMath.ComputeDestination(crop.Size, target, scaling));
+        var crop = ScalingMath.ComputeSourceCrop(imageSize, reference, scaling);
+        var onReference = ScalingMath.ComputeDecodeSize(imageSize, reference, scaling);
+        var decodeSize = new Size(
+            Math.Clamp((int)Math.Ceiling(onReference.Width * (double)target.Width / reference.Width), 1, crop.Width),
+            Math.Clamp((int)Math.Ceiling(onReference.Height * (double)target.Height / reference.Height), 1, crop.Height));
+        var decoded = WicImageLoader.Load(path, crop, decodeSize);
+        var scene = new WallpaperScene(gpu, background, gpu.CreateImageTexture(decoded),
+            ScalingMath.ComputeScaledDestination(crop.Size, reference, target, scaling),
+            ScalingMath.ComputeScaledDestination(imageSize, reference, target, scaling));
         var snow = new SnowEffect(gpu, 20261119);
         scene.Effects.Add(snow);
         return (scene, snow);
     }
+
+    private sealed record OverlayFrame(IReadOnlyList<OverlayShape> Shapes, float Scale);
 
     private static GpuDevice CreateGpu()
     {

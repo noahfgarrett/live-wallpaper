@@ -13,7 +13,7 @@ public sealed class SnowEffectTests
         using var gpu = GpuDevice.Create(useWarp: true);
         using var background = new ImageQuadRenderer(gpu);
         using var target = new OffscreenTarget(gpu, Target);
-        using var scene = new WallpaperScene(background, gpu.CreateImageTexture(OffscreenTarget.Solid(80, 30, 10)), new RectangleF(0, 0, Target.Width, Target.Height));
+        using var scene = new WallpaperScene(gpu, background, gpu.CreateImageTexture(OffscreenTarget.Solid(80, 30, 10)), new RectangleF(0, 0, Target.Width, Target.Height), new RectangleF(0, 0, Target.Width, Target.Height));
         if (snow is not null)
         {
             var effect = new SnowEffect(gpu, seed);
@@ -99,7 +99,7 @@ public sealed class SnowEffectTests
         WindowsOnly.Require();
         using var gpu = GpuDevice.Create(useWarp: true);
         using var background = new ImageQuadRenderer(gpu);
-        using var scene = new WallpaperScene(background, gpu.CreateImageTexture(OffscreenTarget.Solid(0, 0, 0)), new RectangleF(0, 0, 10, 10));
+        using var scene = new WallpaperScene(gpu, background, gpu.CreateImageTexture(OffscreenTarget.Solid(0, 0, 0)), new RectangleF(0, 0, 10, 10), new RectangleF(0, 0, 10, 10));
         var effect = new SnowEffect(gpu, 1);
         scene.Effects.Add(effect);
 
@@ -117,7 +117,7 @@ public sealed class SnowEffectTests
         WindowsOnly.Require();
         using var gpu = GpuDevice.Create(useWarp: true);
         using var background = new ImageQuadRenderer(gpu);
-        using var scene = new WallpaperScene(background, gpu.CreateImageTexture(OffscreenTarget.Solid(0, 0, 0)), new RectangleF(0, 0, 1920, 1080));
+        using var scene = new WallpaperScene(gpu, background, gpu.CreateImageTexture(OffscreenTarget.Solid(0, 0, 0)), new RectangleF(0, 0, 1920, 1080), new RectangleF(0, 0, 1920, 1080));
         var effect = new SnowEffect(gpu, 1);
         effect.Apply(new SnowSettings(DensityPct: 50));
         scene.Effects.Add(effect);
@@ -134,7 +134,7 @@ public sealed class SnowEffectTests
         using var gpu = GpuDevice.Create(useWarp: true);
         using var background = new ImageQuadRenderer(gpu);
         using var target = new OffscreenTarget(gpu, Target);
-        using var scene = new WallpaperScene(background, gpu.CreateImageTexture(OffscreenTarget.Solid(80, 30, 10)), new RectangleF(0, 0, Target.Width, Target.Height));
+        using var scene = new WallpaperScene(gpu, background, gpu.CreateImageTexture(OffscreenTarget.Solid(80, 30, 10)), new RectangleF(0, 0, Target.Width, Target.Height), new RectangleF(0, 0, Target.Width, Target.Height));
         var effect = new SnowEffect(gpu, 7);
         effect.Apply(new SnowSettings(DensityPct: 100, SizePct: 100));
         scene.Effects.Add(effect);

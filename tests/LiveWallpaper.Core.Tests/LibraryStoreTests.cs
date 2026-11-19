@@ -1,5 +1,6 @@
 using LiveWallpaper.Core.Library;
 using LiveWallpaper.Core.Models;
+using LiveWallpaper.Core.Regions;
 
 namespace LiveWallpaper.Core.Tests;
 
@@ -87,6 +88,62 @@ public sealed class LibraryStoreTests : IDisposable
         _store.Update(item with { Snow = snow });
 
         Assert.Equal(snow, Assert.Single(_store.Load()).Snow);
+    }
+
+    [Fact]
+    public void Update_WithRegions_RoundTrips()
+    {
+        var item = _store.Import(SourceFile(), 10, 10);
+        var updated = item with { Regions = new RegionSet([RegionGeometry.CreateQuad()], Invert: true, FeatherPct: 2.5) };
+
+        _store.Update(updated);
+
+        Assert.Equal(updated, Assert.Single(_store.Load()));
+    }
+
+    [Fact]
+    public void Load_LibraryFromM3WithoutRegions_LoadsWithEmptyRegions()
+    {
+        var folder = Path.Combine(_dir.Path, "library");
+        Directory.CreateDirectory(folder);
+        File.WriteAllText(Path.Combine(folder, "library.json"), """
+            {
+                "schemaVersion": 1,
+                "items": [
+                    {
+                        "id": "6f1d2c3b-4a59-4e6f-8a7b-9c0d1e2f3a4b",
+                        "displayName": "Cabin",
+                        "fileName": "source.jpg",
+                        "importedAt": "2026-11-19T08:36:00+00:00",
+                        "pixelWidth": 4000,
+                        "pixelHeight": 3000,
+                        "snow": {
+                            "enabled": true,
+                            "densityPct": 50,
+                            "speedPct": 50,
+                            "windPct": 30,
+                            "sizePct": 50,
+                            "motionBlur": false
+                        }
+                    }
+                ]
+            }
+            """);
+
+        var item = Assert.Single(_store.Load());
+
+        Assert.Equal(RegionSet.Empty, item.Regions);
+        Assert.Empty(Directory.GetFiles(folder, "library.json.corrupt-*"));
+    }
+
+    [Fact]
+    public void Load_InvalidRegions_TreatedAsCorrupt()
+    {
+        var item = _store.Import(SourceFile(), 10, 10);
+        _store.Update(item with { Regions = new RegionSet([new Region([new(0.1, 0.1), new(0.2, 0.2)])]) });
+
+        Assert.Empty(_store.Load());
+        Assert.Single(Directory.GetFiles(Path.Combine(_dir.Path, "library"), "library.json.corrupt-*"));
     }
 
     [Fact]

@@ -28,6 +28,10 @@ public sealed class EngineHost
     private const double PowerCheckIntervalSeconds = 2;
     private const int RecentItemCount = 8;
 
+    private static readonly TimeSpan TakeoverConnectTimeout = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan TakeoverAnswerGrace = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan TakeoverCloseTimeout = TimeSpan.FromSeconds(5);
+
     private readonly GpuDevice _gpu;
     private readonly ImageQuadRenderer _background;
     private readonly SettingsStore _store = new(AppPaths.SettingsFile, TimeProvider.System);
@@ -60,10 +64,9 @@ public sealed class EngineHost
 
     public static int Run()
     {
-        using var instance = SingleInstance.TryAcquire(SingleInstance.EngineMutexName);
+        using var instance = EngineTakeover.TryTakeOver(SingleInstance.EngineMutexName, CurrentEngineAnswers, TakeoverAnswerGrace, TakeoverCloseTimeout, EngineTakeover.StopOtherEngines);
         if (instance is null)
         {
-            Log.Info("engine", "event=already-running");
             return 0;
         }
 
@@ -116,6 +119,10 @@ public sealed class EngineHost
         Log.Info("engine", $"event=stop exitCode={exitCode}");
         return exitCode;
     }
+
+    /// <summary>True when the engine holding the mutex is a current one with a working pipe.</summary>
+    private static bool CurrentEngineAnswers() =>
+        new EngineClient(EnginePipe.Name).SendAsync(new GetStatus(), TakeoverConnectTimeout, CancellationToken.None).GetAwaiter().GetResult() is StatusReport;
 
     private static GpuDevice CreateGpu()
     {
@@ -239,6 +246,17 @@ public sealed class EngineHost
                 foreach (var wallpaper in _wallpapers.Where(w => w.ItemId == update.LibraryItemId))
                 {
                     wallpaper.Snow.Apply(update.Snow);
+                }
+                _needsPresent = true;
+                return new Ok();
+            case UpdateRegions update:
+                if (update.Regions is null || !update.Regions.IsValid)
+                {
+                    return new Failed("Those regions aren't valid.");
+                }
+                foreach (var wallpaper in _wallpapers.Where(w => w.ItemId == update.LibraryItemId))
+                {
+                    wallpaper.Scene.SetRegions(update.Regions);
                 }
                 _needsPresent = true;
                 return new Ok();
@@ -497,7 +515,9 @@ public sealed class EngineHost
                 var crop = ScalingMath.ComputeSourceCrop(imageSize, target, assignment.Scaling);
                 var image = WicImageLoader.Load(imagePath, crop, ScalingMath.ComputeDecodeSize(imageSize, target, assignment.Scaling));
                 var texture = _gpu.CreateImageTexture(image);
-                prepared.Add(new PreparedImage(monitor, item, texture, ScalingMath.ComputeDestination(crop.Size, target, assignment.Scaling)));
+                prepared.Add(new PreparedImage(monitor, item, texture,
+                    ScalingMath.ComputeDestination(crop.Size, target, assignment.Scaling),
+                    ScalingMath.ComputeDestination(imageSize, target, assignment.Scaling)));
                 Log.Info("engine", $"event=decoded monitor=\"{monitor.DeviceName}\" image={imageSize.Width}x{imageSize.Height} decoded={image.Width}x{image.Height} scaling={assignment.Scaling}");
             }
             catch (Exception ex) when (ex is not OutOfMemoryException)
@@ -516,10 +536,11 @@ public sealed class EngineHost
         try
         {
             var target = image.Monitor.Bounds.Size;
-            scene = new WallpaperScene(_background, image.Texture, image.Destination);
+            scene = new WallpaperScene(_gpu, _background, image.Texture, image.Destination, image.ImageBounds);
             var snow = new SnowEffect(_gpu, Seed(image.Monitor.Id));
             scene.Effects.Add(snow);
             snow.Apply(image.Item.Snow);
+            scene.SetRegions(image.Item.Regions);
 
             window = WallpaperWindow.Create();
             DesktopHost.Attach(window.Handle, _plan, image.Monitor.Bounds);
@@ -580,7 +601,7 @@ public sealed class EngineHost
 
     private sealed record PendingRequest(EngineRequest Request, TaskCompletionSource<EngineResponse> Completion);
 
-    private sealed record PreparedImage(MonitorInfo Monitor, LibraryItem Item, ID3D11ShaderResourceView Texture, RectangleF Destination);
+    private sealed record PreparedImage(MonitorInfo Monitor, LibraryItem Item, ID3D11ShaderResourceView Texture, RectangleF Destination, RectangleF ImageBounds);
 
     private sealed record ActiveWallpaper(MonitorInfo Monitor, Guid ItemId, WallpaperWindow Window, WallpaperSurface Surface, WallpaperScene Scene, SnowEffect Snow);
 }

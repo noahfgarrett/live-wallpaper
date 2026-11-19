@@ -4,7 +4,10 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     xmlns:preview="clr-namespace:LiveWallpaper.App.Preview"
-    xmlns:views="clr-namespace:LiveWallpaper.App.Views">
+    xmlns:views="clr-namespace:LiveWallpaper.App.Views"
+    Focusable="True"
+    FocusVisualStyle="{x:Null}"
+    PreviewKeyDown="OnPreviewKeyDown">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
@@ -51,6 +54,38 @@
                     <ui:ToggleSwitch x:Name="MotionBlur" DockPanel.Dock="Right" Checked="OnSnowChanged" Unchecked="OnSnowChanged" />
                     <TextBlock VerticalAlignment="Center" Text="Motion blur" />
                 </DockPanel>
+
+                <TextBlock Style="{StaticResource SectionLabel}" Text="Regions" />
+                <TextBlock Style="{StaticResource HelpText}" Text="Without regions, snow covers the whole picture. Add a region and drag its corners onto a window or the sky." />
+                <Grid Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <ui:Button x:Name="AddRegionButton" Grid.Column="0" HorizontalAlignment="Stretch" Appearance="Primary" Click="OnAddRegion" Content="Add region" Icon="{ui:SymbolIcon Add24}" />
+                    <ui:Button x:Name="DeleteRegionButton" Grid.Column="2" HorizontalAlignment="Stretch" Click="OnDeleteRegion" Content="Delete region" Icon="{ui:SymbolIcon Delete24}" IsEnabled="False" />
+                </Grid>
+                <DockPanel Margin="0,16,0,0">
+                    <ui:ToggleSwitch x:Name="InvertRegions" DockPanel.Dock="Right" Checked="OnInvertChanged" Unchecked="OnInvertChanged" />
+                    <TextBlock Margin="0,0,12,0" VerticalAlignment="Center" Text="Snow everywhere except the regions" TextWrapping="Wrap" />
+                </DockPanel>
+                <DockPanel Margin="0,16,0,4"><TextBlock x:Name="FeatherValue" DockPanel.Dock="Right" Style="{StaticResource HelpText}" /><TextBlock Text="Soft edge" /></DockPanel>
+                <Slider x:Name="Feather" IsSnapToTickEnabled="True" LargeChange="1" Maximum="10" Minimum="0" SmallChange="0.1" TickFrequency="0.1" ValueChanged="OnFeatherChanged" />
+                <DockPanel Margin="0,16,0,0">
+                    <ui:ToggleSwitch x:Name="ShowOutlines" DockPanel.Dock="Right" IsChecked="True" Checked="OnOutlinesChanged" Unchecked="OnOutlinesChanged" />
+                    <TextBlock VerticalAlignment="Center" Text="Show outlines" />
+                </DockPanel>
+                <Grid Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <ui:Button x:Name="UndoButton" Grid.Column="0" HorizontalAlignment="Stretch" Click="OnUndo" Content="Undo" Icon="{ui:SymbolIcon ArrowUndo24}" IsEnabled="False" ToolTip="Undo (Ctrl+Z)" />
+                    <ui:Button x:Name="RedoButton" Grid.Column="2" HorizontalAlignment="Stretch" Click="OnRedo" Content="Redo" Icon="{ui:SymbolIcon ArrowRedo24}" IsEnabled="False" ToolTip="Redo (Ctrl+Y)" />
+                </Grid>
+                <TextBlock Margin="0,8,0,0" Style="{StaticResource HelpText}" Text="Click an edge to add a corner. Right-click a corner, or select it and press Delete, to remove it." />
 
                 <TextBlock Style="{StaticResource SectionLabel}" Text="Scaling" />
                 <ComboBox x:Name="ScalingChoice" SelectionChanged="OnScalingChanged">
