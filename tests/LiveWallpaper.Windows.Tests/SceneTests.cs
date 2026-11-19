@@ -55,6 +55,35 @@ public sealed class SceneTests
     }
 
     [Fact]
+    public void Scene_AllFourEffectsOff_FrameEqualsBackground()
+    {
+        WindowsOnly.Require();
+        using var gpu = GpuDevice.Create(useWarp: true);
+        using var background = new ImageQuadRenderer(gpu);
+        using var expected = new OffscreenTarget(gpu, Target);
+        using var actual = new OffscreenTarget(gpu, Target);
+        using var image = gpu.CreateImageTexture(OffscreenTarget.Solid(80, 30, 10));
+        background.Draw(expected.View, Target, image, FullFrame);
+        using var scene = CreateScene(gpu, background);
+        var snow = new SnowEffect(gpu, 7);
+        snow.Apply(new SnowSettings(Enabled: false));
+        scene.Effects.Add(snow);
+        scene.Effects.Add(new RainEffect(gpu, 7));
+        scene.Effects.Add(new GlassEffect(gpu));
+        scene.Effects.Add(new WaterEffect(gpu));
+        scene.SetRegions(EffectKind.Glass, new RegionSet([RegionGeometry.CreateQuad()], Invert: false, FeatherPct: 0));
+        scene.SetRegions(EffectKind.Water, new RegionSet([RegionGeometry.CreateQuad() with { Flow = EffectRules.DefaultFlow }], Invert: false, FeatherPct: 0));
+
+        for (var i = 1; i <= Frames; i++)
+        {
+            scene.Update(new FrameTime(1.0 / 60, i / 60.0), Target);
+        }
+        scene.Render(actual.View, Target);
+
+        Assert.Equal(expected.ReadBack(), actual.ReadBack());
+    }
+
+    [Fact]
     public void RegionsForAnotherEffect_DoNotMaskSnow()
     {
         WindowsOnly.Require();

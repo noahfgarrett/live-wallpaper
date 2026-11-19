@@ -61,13 +61,13 @@ The bead is placed so it stays inside its cell.
 **Sliding drops:** one column per `80 × sizeMul` px. Each pixel checks its own column and the two next to it.
 - **Timing:** each column runs `cycles = max(1, round(P / lerp(6, 16, r1)))` cycles per period, with a new hash per run (`floor(timePhase × cycles + r2) mod cycles`, as for beads). A run slides only if `r3 < sliding/100`.
 - **Path:**
-  - The drop stays stuck until `start = lerp(0.25, 0.55, r4)` of the cycle.
-  - Then `u` goes from 0 to 1, and `prog = u − sin(2π·hops·u) / (2π·hops) × 0.9`, with hops 3–7. That gives stop-start motion that never reverses.
+  - The drop stays stuck until `start = lerp(0.25, 0.55, r4)` of the cycle. A new run's drop fades in over the first 4 % of the cycle (alpha `smoothstep(0, 0.04, ph)`).
+  - Then `u = saturate((ph − start) / (0.88 − start))` goes from 0 to 1, so the slide ends at 0.88 of the cycle, and `prog = u − sin(2π·hops·u) / (2π·hops) × 0.9`, with hops 3–7. That gives stop-start motion that never reverses.
   - `y = y0 + prog × (1.15 × paneH − y0 + 20)`, where `y0 = r6 × 0.6 × paneH − 10`.
   - `x = baseX + sin(y × f + φ) × a`, with f 0.03–0.07 and a 1–4 px.
 - **Drop shape:** radius 7–13 × sizeMul px. Above its centre it is stretched by 1/0.72 into a teardrop.
 - **Trail:**
-  - It fades with `exp(−behind / (0.35 × paneH))`.
+  - It fades with `exp(−behind / (0.35 × paneH))`, and over the last 12 % of the cycle with `1 − smoothstep(0.88, 1, ph)`. That fade applies to both the fog clearing and the trail beads, so nothing pops when the next run starts.
   - It clears fog within `0.55 r` of the path (soft from 0.4 r).
   - Trail beads are spaced every `7 × sizeMul` px with probability 0.55, radius 0.14–0.32 r.
 

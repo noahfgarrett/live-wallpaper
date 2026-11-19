@@ -2,7 +2,7 @@
 // a segment (edge), a circle (handle, ghost; A == B) or an arrow (segment with a triangular head at B),
 // drawn as a quad around it and shaded by signed distance.
 
-#define MAX_SHAPES 1100
+#define MAX_SHAPES 1120
 
 cbuffer Overlay : register(b0)
 {

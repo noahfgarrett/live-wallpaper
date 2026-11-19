@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using LiveWallpaper.Core.Glass;
 using LiveWallpaper.Core.Models;
 using LiveWallpaper.Core.Regions;
+using LiveWallpaper.Core.Snow;
 using Vortice.Direct3D;
 using Vortice.Direct3D11;
 
@@ -75,9 +76,11 @@ public sealed class GlassEffect : IEffect
         Volatile.Write(ref _paneCount, count);
     }
 
+    /// <summary>Integrates its own clock, so a pause holds the drops still instead of jumping them on resume.</summary>
     public void Update(in FrameTime time, Size targetPixels)
     {
-        _timeSec = time.TotalSeconds;
+        var dt = double.IsFinite(time.DeltaSeconds) ? Math.Max(0, time.DeltaSeconds) : 0;
+        _timeSec = (_timeSec + dt) % SnowModel.PeriodSeconds;
     }
 
     public void Render(ID3D11RenderTargetView target, Size targetPixels, in EffectInputs inputs)

@@ -36,6 +36,19 @@ public sealed class RegionOverlayRendererTests
     }
 
     [Fact]
+    public void MaxShapes_FitsTheLargestFlowOverlay()
+    {
+        // Every edge of the largest set, the selected region's handles and its ghost, then an arrow per region and the selected arrowhead.
+        const int Largest = (RegionSet.MaxRegions * RegionSet.MaxPoints) + RegionSet.MaxPoints + 1 + RegionSet.MaxRegions + 1;
+        using var stream = typeof(RegionOverlayRenderer).Assembly.GetManifestResourceStream("LiveWallpaper.Rendering.Shaders." + RegionOverlayRenderer.ShaderResource);
+        Assert.NotNull(stream);
+        using var reader = new StreamReader(stream);
+
+        Assert.True(RegionOverlayRenderer.MaxShapes >= Largest, $"{RegionOverlayRenderer.MaxShapes} < {Largest}");
+        Assert.Contains($"#define MAX_SHAPES {RegionOverlayRenderer.MaxShapes}", reader.ReadToEnd(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Handle_DrawsAtItsPoint()
     {
         WindowsOnly.Require();

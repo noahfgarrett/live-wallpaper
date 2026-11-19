@@ -45,7 +45,7 @@ public sealed class GlassEffectTests
         return new DecodedImage(size, size, size * 4, pixels);
     }
 
-    private static byte[] Render(GlassSettings? glass, RegionSet? regions = null, double seconds = 3)
+    private static byte[] Render(GlassSettings? glass, RegionSet? regions = null, double seconds = 3, double clockStartSeconds = 0)
     {
         using var gpu = GpuDevice.Create(useWarp: true);
         using var background = new ImageQuadRenderer(gpu);
@@ -64,7 +64,7 @@ public sealed class GlassEffectTests
         var frames = (int)Math.Round(seconds / FrameSeconds);
         for (var i = 1; i <= frames; i++)
         {
-            scene.Update(new FrameTime(FrameSeconds, i * FrameSeconds), Target);
+            scene.Update(new FrameTime(FrameSeconds, clockStartSeconds + (i * FrameSeconds)), Target);
         }
         scene.Render(target.View, Target);
         return target.ReadBack();
@@ -129,6 +129,18 @@ public sealed class GlassEffectTests
 
         var changed = Differing(pixels, frame, (x, _) => x < Target.Width / 2);
         Assert.True(changed > Target.Width / 2 * Target.Height / 2, $"only {changed} pixels changed");
+    }
+
+    [Fact]
+    public void Glass_FollowsFrameDeltas_NotTheEngineClock()
+    {
+        WindowsOnly.Require();
+        var fresh = Render(Fogged, LeftHalf(), seconds: 1);
+
+        // The same second of animation, but after the engine clock ran half an hour while paused.
+        var resumed = Render(Fogged, LeftHalf(), seconds: 1, clockStartSeconds: 1800);
+
+        Assert.Equal(fresh, resumed);
     }
 
     [Fact]
