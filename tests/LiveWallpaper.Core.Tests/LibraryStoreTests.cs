@@ -169,13 +169,19 @@ public sealed class LibraryStoreTests : IDisposable
     }
 
     [Fact]
-    public void Update_WhileAnotherReaderHasTheIndexOpen_Succeeds()
+    public async Task Update_WhileAnotherReaderBrieflyHasTheIndexOpen_Succeeds()
     {
         var item = _store.Import(SourceFile(), 10, 10);
         var index = Path.Combine(_dir.Path, "library", "library.json");
-        using var reader = new FileStream(index, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        var reader = new FileStream(index, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        var release = Task.Run(async () =>
+        {
+            await Task.Delay(100);
+            await reader.DisposeAsync();
+        }, TestContext.Current.CancellationToken);
 
         _store.Update(item with { Snow = new SnowSettings(DensityPct: 10) });
+        await release;
 
         Assert.Equal(10, Assert.Single(_store.Load()).Snow.DensityPct);
     }

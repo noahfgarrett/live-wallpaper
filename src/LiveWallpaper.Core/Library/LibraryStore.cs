@@ -123,7 +123,7 @@ public sealed class LibraryStore(string libraryDirectory, TimeProvider timeProvi
         {
             JsonSerializer.Serialize(stream, new LibraryDocument(LibraryDocument.CurrentSchemaVersion, items), CoreJsonContext.Default.LibraryDocument);
         }
-        File.Move(tempPath, IndexPath, overwrite: true);
+        AtomicFile.Replace(tempPath, IndexPath);
     }
 
     private static void DeleteFolder(string folder)

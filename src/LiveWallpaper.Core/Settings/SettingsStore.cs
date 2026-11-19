@@ -24,7 +24,7 @@ public sealed class SettingsStore(string filePath, TimeProvider timeProvider)
 
         try
         {
-            using var stream = File.OpenRead(filePath);
+            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             var settings = JsonSerializer.Deserialize(stream, CoreJsonContext.Default.AppSettings)
                 ?? throw new JsonException("Settings file contained null.");
             Validate(settings);
@@ -74,6 +74,6 @@ public sealed class SettingsStore(string filePath, TimeProvider timeProvider)
         {
             JsonSerializer.Serialize(stream, settings, CoreJsonContext.Default.AppSettings);
         }
-        File.Move(tempPath, filePath, overwrite: true);
+        AtomicFile.Replace(tempPath, filePath);
     }
 }
