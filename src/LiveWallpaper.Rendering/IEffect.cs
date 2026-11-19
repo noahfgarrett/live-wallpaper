@@ -15,5 +15,8 @@ public interface IEffect : IDisposable
 
     void Update(in FrameTime time, Size targetPixels);
 
-    void Render(ID3D11RenderTargetView target, Size targetPixels);
+    /// <param name="target">The render target.</param>
+    /// <param name="targetPixels">Its size in pixels.</param>
+    /// <param name="mask">The region mask, sampled across the whole target; one white pixel when there are no regions.</param>
+    void Render(ID3D11RenderTargetView target, Size targetPixels, ID3D11ShaderResourceView mask);
 }

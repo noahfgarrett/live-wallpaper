@@ -497,7 +497,9 @@ public sealed class EngineHost
                 var crop = ScalingMath.ComputeSourceCrop(imageSize, target, assignment.Scaling);
                 var image = WicImageLoader.Load(imagePath, crop, ScalingMath.ComputeDecodeSize(imageSize, target, assignment.Scaling));
                 var texture = _gpu.CreateImageTexture(image);
-                prepared.Add(new PreparedImage(monitor, item, texture, ScalingMath.ComputeDestination(crop.Size, target, assignment.Scaling)));
+                prepared.Add(new PreparedImage(monitor, item, texture,
+                    ScalingMath.ComputeDestination(crop.Size, target, assignment.Scaling),
+                    ScalingMath.ComputeDestination(imageSize, target, assignment.Scaling)));
                 Log.Info("engine", $"event=decoded monitor=\"{monitor.DeviceName}\" image={imageSize.Width}x{imageSize.Height} decoded={image.Width}x{image.Height} scaling={assignment.Scaling}");
             }
             catch (Exception ex) when (ex is not OutOfMemoryException)
@@ -516,7 +518,7 @@ public sealed class EngineHost
         try
         {
             var target = image.Monitor.Bounds.Size;
-            scene = new WallpaperScene(_background, image.Texture, image.Destination);
+            scene = new WallpaperScene(_gpu, _background, image.Texture, image.Destination, image.ImageBounds);
             var snow = new SnowEffect(_gpu, Seed(image.Monitor.Id));
             scene.Effects.Add(snow);
             snow.Apply(image.Item.Snow);
@@ -580,7 +582,7 @@ public sealed class EngineHost
 
     private sealed record PendingRequest(EngineRequest Request, TaskCompletionSource<EngineResponse> Completion);
 
-    private sealed record PreparedImage(MonitorInfo Monitor, LibraryItem Item, ID3D11ShaderResourceView Texture, RectangleF Destination);
+    private sealed record PreparedImage(MonitorInfo Monitor, LibraryItem Item, ID3D11ShaderResourceView Texture, RectangleF Destination, RectangleF ImageBounds);
 
     private sealed record ActiveWallpaper(MonitorInfo Monitor, Guid ItemId, WallpaperWindow Window, WallpaperSurface Surface, WallpaperScene Scene, SnowEffect Snow);
 }

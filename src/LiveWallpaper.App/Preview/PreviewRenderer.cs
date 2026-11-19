@@ -163,7 +163,9 @@ public sealed class PreviewRenderer : IDisposable
         var imageSize = WicImageLoader.ReadSize(path);
         var crop = ScalingMath.ComputeSourceCrop(imageSize, target, scaling);
         var decoded = WicImageLoader.Load(path, crop, ScalingMath.ComputeDecodeSize(imageSize, target, scaling));
-        var scene = new WallpaperScene(background, gpu.CreateImageTexture(decoded), ScalingMath.ComputeDestination(crop.Size, target, scaling));
+        var scene = new WallpaperScene(gpu, background, gpu.CreateImageTexture(decoded),
+            ScalingMath.ComputeDestination(crop.Size, target, scaling),
+            ScalingMath.ComputeDestination(imageSize, target, scaling));
         var snow = new SnowEffect(gpu, 20261119);
         scene.Effects.Add(snow);
         return (scene, snow);
