@@ -2,11 +2,11 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace LiveWallpaper.Core.Models;
 
-public sealed record MonitorAssignment(string MonitorId, string ImagePath, WallpaperScaling Scaling);
+public sealed record MonitorAssignment(string MonitorId, Guid LibraryItemId, WallpaperScaling Scaling);
 
 public sealed record AppSettings
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
 
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
 
@@ -17,4 +17,9 @@ public sealed record AppSettings
         init => field = value ?? [];
     } = [];
 
+    public FrameRateMode FrameRate { get; init; } = FrameRateMode.Fps60;
+
+    public WallpaperScaling DefaultScaling { get; init; } = WallpaperScaling.Fill;
+
+    public bool KeepRunningWhenAppCloses { get; init; } = true;
 }

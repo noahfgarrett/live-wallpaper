@@ -8,7 +8,6 @@ public enum MessageWindowEvent
 {
     ExplorerRestarted,
     DisplayChanged,
-    ReloadRequested,
     CloseRequested,
     AttachmentCheckDue,
 }
@@ -22,7 +21,6 @@ public sealed unsafe class MessageWindow : IDisposable
     private const uint DebounceMs = 500;
 
     private static readonly uint s_taskbarCreated = User32.RegisterWindowMessage("TaskbarCreated");
-    private static readonly uint s_reload = User32.RegisterWindowMessage("LiveWallpaper.Reload");
     private static readonly Lock s_registerGate = new();
     private static bool s_registered;
     private static MessageWindow? s_current;
@@ -51,9 +49,9 @@ public sealed unsafe class MessageWindow : IDisposable
 
     public nint Handle { get; }
 
-    public static nint FindRunning() => User32.FindWindow(ClassName, null);
+    public Func<uint, nuint, nint, bool>? RawMessageHandler { get; set; }
 
-    public static void PostReload(nint window) => User32.PostMessage(window, s_reload, 0, 0);
+    public static nint FindRunning() => User32.FindWindow(ClassName, null);
 
     public static void PostClose(nint window) => User32.PostMessage(window, User32.WM_CLOSE, 0, 0);
 
@@ -112,9 +110,8 @@ public sealed unsafe class MessageWindow : IDisposable
             Debounce(MessageWindowEvent.ExplorerRestarted);
             return 0;
         }
-        if (msg == s_reload)
+        if (RawMessageHandler is { } handler && handler(msg, wParam, lParam))
         {
-            Raise(MessageWindowEvent.ReloadRequested);
             return 0;
         }
         switch (msg)

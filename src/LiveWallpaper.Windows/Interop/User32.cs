@@ -173,6 +173,74 @@ internal static unsafe partial class User32
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool EnumChildWindows(nint parent, delegate* unmanaged<nint, nint, int> callback, nint data);
 
+    public const uint QS_ALLINPUT = 0x04FF;
+    public const uint MWMO_INPUTAVAILABLE = 0x0004;
+    public const uint PM_REMOVE = 0x0001;
+    public const uint WM_QUIT = 0x0012;
+    public const uint INFINITE = 0xFFFFFFFF;
+
+    [LibraryImport("user32.dll")]
+    public static partial uint MsgWaitForMultipleObjectsEx(uint count, nint* handles, uint milliseconds, uint wakeMask, uint flags);
+
+    [LibraryImport("user32.dll", EntryPoint = "PeekMessageW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool PeekMessage(out MSG msg, nint hWnd, uint filterMin, uint filterMax, uint remove);
+
+    public const uint MF_STRING = 0x0000;
+    public const uint MF_POPUP = 0x0010;
+    public const uint MF_SEPARATOR = 0x0800;
+    public const uint MF_GRAYED = 0x0001;
+    public const uint TPM_RIGHTBUTTON = 0x0002;
+    public const uint TPM_RETURNCMD = 0x0100;
+    public const uint TPM_NONOTIFY = 0x0080;
+    public const uint WM_NULL = 0x0000;
+    public const uint WM_APP = 0x8000;
+    public const uint WM_CONTEXTMENU = 0x007B;
+    public const uint WM_LBUTTONDBLCLK = 0x0203;
+    public const uint NIN_SELECT = 0x0400;
+    public const uint NIN_KEYSELECT = 0x0401;
+    public const uint IMAGE_ICON = 1;
+    public const uint LR_LOADFROMFILE = 0x0010;
+    public const int SM_CXSMICON = 49;
+    public const int SM_CYSMICON = 50;
+    public const int ENUM_CURRENT_SETTINGS = -1;
+
+    [LibraryImport("user32.dll")]
+    public static partial nint CreatePopupMenu();
+
+    [LibraryImport("user32.dll", EntryPoint = "AppendMenuW", StringMarshalling = StringMarshalling.Utf16)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool AppendMenu(nint menu, uint flags, nuint idOrSubmenu, string? text);
+
+    [LibraryImport("user32.dll")]
+    public static partial int TrackPopupMenuEx(nint menu, uint flags, int x, int y, nint hWnd, nint parameters);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool DestroyMenu(nint menu);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool SetForegroundWindow(nint hWnd);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GetCursorPos(out POINT point);
+
+    [LibraryImport("user32.dll", EntryPoint = "LoadImageW", StringMarshalling = StringMarshalling.Utf16)]
+    public static partial nint LoadImage(nint instance, string name, uint type, int cx, int cy, uint flags);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool DestroyIcon(nint icon);
+
+    [LibraryImport("user32.dll")]
+    public static partial int GetSystemMetrics(int index);
+
+    [LibraryImport("user32.dll", EntryPoint = "EnumDisplaySettingsW", StringMarshalling = StringMarshalling.Utf16)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool EnumDisplaySettings(string deviceName, int modeNum, ref DEVMODEW devMode);
+
     public static string GetClassName(nint hWnd)
     {
         var buffer = stackalloc char[256];

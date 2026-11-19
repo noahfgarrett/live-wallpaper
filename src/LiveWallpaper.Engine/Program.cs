@@ -2,6 +2,8 @@ using System.Text.Json;
 using LiveWallpaper.Core;
 using LiveWallpaper.Core.Desktop;
 using LiveWallpaper.Core.Diagnostics;
+using LiveWallpaper.Core.Ipc;
+using LiveWallpaper.Core.Library;
 using LiveWallpaper.Core.Models;
 using LiveWallpaper.Core.Settings;
 using LiveWallpaper.Media;
@@ -86,49 +88,43 @@ public static class Program
     private static int SetWallpaper(EngineCommand.SetWallpaper set)
     {
         var imagePath = Path.GetFullPath(set.ImagePath);
+        System.Drawing.Size size;
         try
         {
-            WicImageLoader.ReadSize(imagePath);
+            size = WicImageLoader.ReadSize(imagePath);
         }
         catch (ImageLoadException ex)
         {
             return Fail(ex.Message, 1);
         }
 
-        var monitors = MonitorEnumerator.Enumerate();
+        var item = new LibraryStore(AppPaths.LibraryDirectory, TimeProvider.System).Import(imagePath, size.Width, size.Height);
+        var request = new ApplyWallpaper(item.Id, set.MonitorSelector, set.Scaling);
+        var response = new EngineClient(EnginePipe.Name).SendAsync(request, TimeSpan.FromMilliseconds(500), CancellationToken.None).GetAwaiter().GetResult();
+        switch (response)
+        {
+            case Ok:
+                Console.WriteLine("Wallpaper set.");
+                return 0;
+            case Failed failed:
+                return Fail(failed.Message, 1);
+        }
+
         var store = new SettingsStore(AppPaths.SettingsFile, TimeProvider.System);
         var current = store.Load().Settings;
-
-        IReadOnlyList<MonitorAssignment> assignments;
-        if (string.Equals(set.MonitorSelector, EngineCommandParser.AllMonitors, StringComparison.OrdinalIgnoreCase))
+        var monitorIds = MonitorEnumerator.Enumerate().Select(m => m.Id).ToList();
+        var assignments = MonitorAssignments.Apply(current.Monitors, monitorIds, item.Id, set.MonitorSelector, set.Scaling);
+        if (assignments is null)
         {
-            assignments = monitors.Select(m => new MonitorAssignment(m.Id, imagePath, set.Scaling)).ToList();
+            return Fail($"No monitor has the id '{set.MonitorSelector}'. Run --list-monitors to see the ids.", 1);
         }
-        else
-        {
-            var monitor = monitors.FirstOrDefault(m => string.Equals(m.Id, set.MonitorSelector, StringComparison.OrdinalIgnoreCase));
-            if (monitor is null)
-            {
-                return Fail($"No monitor has the id '{set.MonitorSelector}'. Run --list-monitors to see the ids.", 1);
-            }
-            assignments = current.Monitors
-                .Where(a => !string.Equals(a.MonitorId, monitor.Id, StringComparison.OrdinalIgnoreCase))
-                .Append(new MonitorAssignment(monitor.Id, imagePath, set.Scaling))
-                .ToList();
-        }
-
         store.Save(current with { Monitors = assignments });
-        var running = MessageWindow.FindRunning();
-        if (running != 0)
-        {
-            MessageWindow.PostReload(running);
-        }
-        Console.WriteLine($"Wallpaper set on {(assignments.Count == 1 ? "1 monitor" : $"{assignments.Count} monitors")}.{(running == 0 ? " Start LiveWallpaper.Engine.exe to show it." : "")}");
+        Console.WriteLine("Wallpaper set. Start LiveWallpaper.Engine.exe to show it.");
         return 0;
     }
 
     private static string Describe(MonitorInfo m) =>
-        $"{m.Id}  bounds={m.Bounds.X},{m.Bounds.Y} {m.Bounds.Width}x{m.Bounds.Height}  dpi={m.Dpi}{(m.IsPrimary ? "  primary" : "")}";
+        $"{m.Id}  bounds={m.Bounds.X},{m.Bounds.Y} {m.Bounds.Width}x{m.Bounds.Height}  dpi={m.Dpi}  refresh={m.RefreshHz}Hz{(m.IsPrimary ? "  primary" : "")}";
 
     private static int Fail(string message, int exitCode)
     {

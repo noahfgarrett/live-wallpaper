@@ -1,0 +1,64 @@
+<UserControl
+    x:Class="LiveWallpaper.App.Views.SettingsView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="720" Margin="0,4,0,16" HorizontalAlignment="Left">
+            <ui:TextBlock FontTypography="Title" Text="Settings" />
+            <ui:InfoBar x:Name="EngineWarning" Margin="0,12,0,0" IsClosable="False" Severity="Warning" Title="The wallpaper engine isn't running." Message="Settings that belong to the engine can be changed once it's running." />
+
+            <TextBlock Style="{StaticResource SectionLabel}" Text="Startup" />
+            <ui:Card>
+                <DockPanel>
+                    <ui:ToggleSwitch x:Name="StartWithWindows" DockPanel.Dock="Right" Checked="OnStartupChanged" Unchecked="OnStartupChanged" />
+                    <StackPanel>
+                        <TextBlock Text="Start with Windows" />
+                        <TextBlock Style="{StaticResource HelpText}" Text="Starts the wallpaper engine when you sign in, so your wallpaper comes back without opening the app." />
+                    </StackPanel>
+                </DockPanel>
+            </ui:Card>
+            <ui:Card Margin="0,8,0,0">
+                <DockPanel>
+                    <ui:ToggleSwitch x:Name="KeepRunning" DockPanel.Dock="Right" Checked="OnPreferenceChanged" Unchecked="OnPreferenceChanged" />
+                    <StackPanel>
+                        <TextBlock Text="Keep the wallpaper running when the app is closed" />
+                        <TextBlock Style="{StaticResource HelpText}" Text="The engine stays in the tray. Turn this off to stop the wallpaper whenever you close this window." />
+                    </StackPanel>
+                </DockPanel>
+            </ui:Card>
+
+            <TextBlock Style="{StaticResource SectionLabel}" Text="Animation" />
+            <ui:Card>
+                <DockPanel>
+                    <ComboBox x:Name="FrameRate" DockPanel.Dock="Right" MinWidth="160" SelectionChanged="OnPreferenceChanged">
+                        <ComboBoxItem Content="30 fps" Tag="Fps30" />
+                        <ComboBoxItem Content="60 fps" Tag="Fps60" />
+                        <ComboBoxItem Content="Adaptive" Tag="Adaptive" />
+                    </ComboBox>
+                    <StackPanel>
+                        <TextBlock Text="Frame rate" />
+                        <TextBlock Style="{StaticResource HelpText}" Text="Adaptive matches your display up to 60 fps and drops to 30 fps on battery." />
+                    </StackPanel>
+                </DockPanel>
+            </ui:Card>
+
+            <TextBlock Style="{StaticResource SectionLabel}" Text="Wallpaper" />
+            <ui:Card>
+                <DockPanel>
+                    <ComboBox x:Name="DefaultScaling" DockPanel.Dock="Right" MinWidth="160" SelectionChanged="OnPreferenceChanged">
+                        <ComboBoxItem Content="Fill" Tag="Fill" />
+                        <ComboBoxItem Content="Fit" Tag="Fit" />
+                        <ComboBoxItem Content="Stretch" Tag="Stretch" />
+                        <ComboBoxItem Content="Center" Tag="Center" />
+                    </ComboBox>
+                    <StackPanel>
+                        <TextBlock Text="Default scaling" />
+                        <TextBlock Style="{StaticResource HelpText}" Text="The starting choice when you apply an image." />
+                    </StackPanel>
+                </DockPanel>
+            </ui:Card>
+            <TextBlock x:Name="ErrorText" Margin="0,12,0,0" Foreground="#FF998A" TextWrapping="Wrap" />
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

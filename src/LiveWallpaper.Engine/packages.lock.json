@@ -48,6 +48,7 @@
       "livewallpaper.rendering": {
         "type": "Project",
         "dependencies": {
+          "LiveWallpaper.Core": "[1.0.0, )",
           "LiveWallpaper.Media": "[1.0.0, )",
           "Vortice.D3DCompiler": "[3.8.3, )",
           "Vortice.DXGI": "[3.8.3, )",

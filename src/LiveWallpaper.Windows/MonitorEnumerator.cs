@@ -35,9 +35,18 @@ public static unsafe class MonitorEnumerator
                 deviceName,
                 info.rcMonitor.ToRectangle(),
                 dpi,
-                (info.dwFlags & User32.MONITORINFOF_PRIMARY) != 0));
+                (info.dwFlags & User32.MONITORINFOF_PRIMARY) != 0,
+                RefreshRate(deviceName)));
         }
         return monitors;
+    }
+
+    private static double RefreshRate(string deviceName)
+    {
+        var mode = new DEVMODEW { dmSize = (ushort)sizeof(DEVMODEW) };
+        return User32.EnumDisplaySettings(deviceName, User32.ENUM_CURRENT_SETTINGS, ref mode) && mode.dmDisplayFrequency > 1
+            ? mode.dmDisplayFrequency
+            : 60;
     }
 
     private static string StableId(string deviceName)

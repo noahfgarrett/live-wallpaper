@@ -1,0 +1,34 @@
+<UserControl
+    x:Class="LiveWallpaper.App.Views.ApplyPanel"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    <Border
+        Width="420"
+        Padding="24"
+        HorizontalAlignment="Center"
+        VerticalAlignment="Center"
+        Background="{DynamicResource ApplicationBackgroundBrush}"
+        BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+        BorderThickness="1"
+        CornerRadius="12">
+        <StackPanel>
+            <ui:TextBlock FontTypography="Subtitle" Text="Apply to desktop" />
+            <TextBlock x:Name="ItemName" Margin="0,4,0,0" Style="{StaticResource HelpText}" />
+            <TextBlock Style="{StaticResource SectionLabel}" Text="Show it on" />
+            <StackPanel x:Name="MonitorChoices" />
+            <TextBlock Style="{StaticResource SectionLabel}" Text="Scaling" />
+            <ComboBox x:Name="ScalingChoice" HorizontalAlignment="Stretch">
+                <ComboBoxItem Content="Fill" Tag="Fill" />
+                <ComboBoxItem Content="Fit" Tag="Fit" />
+                <ComboBoxItem Content="Stretch" Tag="Stretch" />
+                <ComboBoxItem Content="Center" Tag="Center" />
+            </ComboBox>
+            <TextBlock x:Name="ErrorText" Margin="0,12,0,0" Foreground="#FF998A" TextWrapping="Wrap" Visibility="Collapsed" />
+            <StackPanel Margin="0,24,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
+                <ui:Button Margin="0,0,8,0" Click="OnCancel" Content="Cancel" />
+                <ui:Button x:Name="ApplyButton" Appearance="Primary" Click="OnApply" Content="Apply" Icon="{ui:SymbolIcon Desktop24}" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>

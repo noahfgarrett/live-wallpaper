@@ -8,7 +8,11 @@
         <ApplicationManifest>app.manifest</ApplicationManifest>
         <Product>Live Wallpaper</Product>
         <AssemblyTitle>Live Wallpaper Engine</AssemblyTitle>
+        <ApplicationIcon>..\..\assets\LiveWallpaper.ico</ApplicationIcon>
     </PropertyGroup>
+    <ItemGroup>
+        <Content Include="..\..\assets\LiveWallpaper.ico" Link="LiveWallpaper.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="..\LiveWallpaper.Core\LiveWallpaper.Core.csproj" />
         <ProjectReference Include="..\LiveWallpaper.Windows\LiveWallpaper.Windows.csproj" />

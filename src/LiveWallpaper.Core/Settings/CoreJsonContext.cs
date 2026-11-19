@@ -10,6 +10,7 @@ namespace LiveWallpaper.Core.Settings;
     RespectNullableAnnotations = true,
     RespectRequiredConstructorParameters = true)]
 [JsonSerializable(typeof(AppSettings))]
+[JsonSerializable(typeof(LibraryDocument))]
 [JsonSerializable(typeof(DesktopSnapshot))]
 [JsonSerializable(typeof(DesktopDump))]
 public sealed partial class CoreJsonContext : JsonSerializerContext;

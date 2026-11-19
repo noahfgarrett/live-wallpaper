@@ -27,21 +27,4 @@ public sealed class MessageWindowTests
 
         Assert.Equal([MessageWindowEvent.CloseRequested], events);
     }
-
-    [Fact]
-    public void PostReload_DeliversReloadRequested()
-    {
-        WindowsOnly.Require();
-        var events = new List<MessageWindowEvent>();
-        using var window = new MessageWindow(e =>
-        {
-            events.Add(e);
-            MessageWindow.Quit();
-        });
-
-        MessageWindow.PostReload(window.Handle);
-        window.RunMessageLoop();
-
-        Assert.Equal([MessageWindowEvent.ReloadRequested], events);
-    }
 }
