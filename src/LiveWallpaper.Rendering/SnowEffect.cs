@@ -21,6 +21,7 @@ public sealed unsafe class SnowEffect : IEffect
     private readonly ID3D11ShaderResourceView _atlas;
     private readonly ID3D11SamplerState _sampler;
     private readonly ID3D11BlendState _blend;
+    private readonly ID3D11RasterizerState _noCulling;
     private readonly FallClock _fallClock = new();
     private readonly WindModel _wind;
     private SnowSettings _settings = new();
@@ -38,6 +39,7 @@ public sealed unsafe class SnowEffect : IEffect
         gpu.Context.UpdateSubresource(BuildLayerTable(), _layerBuffer);
         _sampler = gpu.Device.CreateSamplerState(SamplerDescription.LinearClamp);
         _blend = gpu.Device.CreateBlendState(BlendDescription.AlphaBlend);
+        _noCulling = gpu.Device.CreateRasterizerState(RasterizerDescription.CullNone);
 
         var pixels = FlakeAtlas.GenerateBgra();
         const uint width = FlakeAtlas.CellPx * FlakeAtlas.Cells;
@@ -85,6 +87,7 @@ public sealed unsafe class SnowEffect : IEffect
         context.UpdateSubresource(in _constants, _frameBuffer);
         context.OMSetRenderTargets(target);
         context.OMSetBlendState(_blend);
+        context.RSSetState(_noCulling);
         context.RSSetViewport(0, 0, targetPixels.Width, targetPixels.Height);
         context.IASetPrimitiveTopology(PrimitiveTopology.TriangleStrip);
         context.VSSetShader(_vertexShader);
@@ -98,6 +101,7 @@ public sealed unsafe class SnowEffect : IEffect
 
     public void Dispose()
     {
+        _noCulling.Dispose();
         _blend.Dispose();
         _sampler.Dispose();
         _atlas.Dispose();
