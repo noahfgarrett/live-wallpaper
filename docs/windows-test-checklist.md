@@ -46,6 +46,15 @@ Run the commands from PowerShell in the folder you unzipped.
 13. **Bad files.** Run `--set` with a path that doesn't exist, then with a `.txt` file renamed to `.jpg`.
     - Expected: each gives a clear one-line error, and a running engine is unaffected.
     - Result:
-14. **Resource use.** With the wallpaper showing on all monitors for 1 minute, read Task Manager's **Details** tab.
+14. **Phone photo orientation.** Set a portrait photo taken on a phone.
+    - Expected: it's upright, the same way the Photos app shows it.
+    - Result:
+15. **Slideshow or Spotlight users.** If your normal background is a slideshow or Windows Spotlight, start and then `--stop` the engine.
+    - Expected: the slideshow or Spotlight is still active afterwards (Settings → Personalization → Background).
+    - Result:
+16. **New monitor to the left.** With the engine running, add or arrange a monitor to the left of the primary in Settings → Display.
+    - Expected: every display's wallpaper lines up with its own screen afterwards.
+    - Result:
+17. **Resource use.** With the wallpaper showing on all monitors for 1 minute, read Task Manager's **Details** tab.
     - Expected: note the **Memory (private working set)** and **CPU** for `LiveWallpaper.Engine.exe`. CPU should be about 0%, since M1 draws once.
     - Result:

@@ -12,6 +12,9 @@ public static class DesktopHost
     private const uint SplitTimeoutMs = 1000;
     private const int SplitPollAttempts = 10;
     private const int SplitPollIntervalMs = 100;
+    private const int MaxSiblingWalk = 512;
+
+    public static bool HasTouchedDesktop { get; private set; }
 
     public static DesktopAttachPlan Prepare()
     {
@@ -22,12 +25,13 @@ public static class DesktopHost
         }
 
         var plan = DesktopLayoutClassifier.Classify(DesktopSnapshotter.Capture());
-        if (plan is not DesktopAttachPlan.Unsupported)
+        if (plan is not DesktopAttachPlan.Unsupported { Reason: DesktopAttachPlan.NotSplitReason })
         {
-            Log.Info("desktop", $"event=already-split plan={plan}");
+            Log.Info("desktop", $"event=classified plan={plan}");
             return plan;
         }
 
+        HasTouchedDesktop = true;
         foreach (var (wParam, lParam) in new (nuint, nint)[] { (0xD, 0x1), (0, 0) })
         {
             User32.SendMessageTimeout(progman, SplitMessage, wParam, lParam, User32.SMTO_NORMAL, SplitTimeoutMs, out _);
@@ -63,10 +67,14 @@ public static class DesktopHost
         if (isLayered)
         {
             var exStyle = (long)User32.GetWindowLongPtr(window, User32.GWL_EXSTYLE);
-            User32.SetWindowLongPtr(window, User32.GWL_EXSTYLE, (nint)(exStyle | User32.WS_EX_LAYERED));
-            User32.SetLayeredWindowAttributes(window, 0, 255, User32.LWA_ALPHA);
+            User32.SetWindowLongPtr(window, User32.GWL_EXSTYLE, (nint)(exStyle | User32.WS_EX_LAYERED | User32.WS_EX_TRANSPARENT));
+            if (!User32.SetLayeredWindowAttributes(window, 0, 255, User32.LWA_ALPHA))
+            {
+                throw new InvalidOperationException("Windows refused to make the wallpaper window layered.");
+            }
         }
 
+        HasTouchedDesktop = true;
         User32.SetParent(window, parent);
         if (User32.GetParent(window) != parent)
         {
@@ -77,35 +85,44 @@ public static class DesktopHost
         User32.ClientToScreen(parent, ref origin);
         var rect = DesktopCoordinates.ScreenToParentClient(monitorBounds, new Point(origin.X, origin.Y));
         var flags = User32.SWP_NOACTIVATE | (isLayered ? 0 : User32.SWP_NOZORDER);
-        User32.SetWindowPos(window, insertAfter, rect.X, rect.Y, rect.Width, rect.Height, flags);
+        if (!User32.SetWindowPos(window, insertAfter, rect.X, rect.Y, rect.Width, rect.Height, flags))
+        {
+            throw new InvalidOperationException("Windows refused to position the wallpaper window.");
+        }
+        if (!IsStillAttached(window, plan, monitorBounds))
+        {
+            throw new InvalidOperationException("The wallpaper window didn't end up behind the desktop icons, so it was not shown.");
+        }
         Log.Info("desktop", $"event=attached window=0x{window:X} parent=0x{parent:X} rect={rect.X},{rect.Y},{rect.Width}x{rect.Height} layered={isLayered}");
     }
 
-    public static bool IsStillAttached(nint window, DesktopAttachPlan plan)
+    public static bool IsStillAttached(nint window, DesktopAttachPlan plan, Rectangle monitorBounds)
     {
-        if (!User32.IsWindow(window))
+        if (!User32.IsWindow(window) || !User32.GetWindowRect(window, out var rect) || rect.ToRectangle() != monitorBounds)
         {
             return false;
         }
         switch (plan)
         {
             case DesktopAttachPlan.LegacyWorkerW legacy:
-                return User32.GetParent(window) == (nint)legacy.WorkerW;
+                return User32.IsWindow((nint)legacy.WorkerW) && User32.GetParent(window) == (nint)legacy.WorkerW;
             case DesktopAttachPlan.ProgmanChild raised:
                 if (User32.GetParent(window) != (nint)raised.Progman || User32.GetParent((nint)raised.DefView) != (nint)raised.Progman)
                 {
                     return false;
                 }
-                for (var h = User32.GetWindow((nint)raised.DefView, User32.GW_HWNDNEXT); h != 0; h = User32.GetWindow(h, User32.GW_HWNDNEXT))
+                var h = User32.GetWindow((nint)raised.DefView, User32.GW_HWNDNEXT);
+                for (var steps = 0; h != 0 && steps < MaxSiblingWalk; steps++)
                 {
                     if (h == window)
                     {
                         return true;
                     }
-                    if (h == (nint)raised.WorkerW)
+                    if (User32.GetClassName(h) == DesktopLayoutClassifier.WorkerWClass)
                     {
                         return false;
                     }
+                    h = User32.GetWindow(h, User32.GW_HWNDNEXT);
                 }
                 return false;
             default:

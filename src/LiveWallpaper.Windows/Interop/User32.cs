@@ -10,6 +10,9 @@ internal static unsafe partial class User32
     public const int GWL_EXSTYLE = -20;
     public const long WS_POPUP = 0x80000000L;
     public const long WS_CHILD = 0x40000000L;
+    public const long WS_CLIPSIBLINGS = 0x04000000L;
+    public const long WS_EX_NOPARENTNOTIFY = 0x00000004L;
+    public const long WS_EX_TRANSPARENT = 0x00000020L;
     public const long WS_EX_TOOLWINDOW = 0x00000080L;
     public const long WS_EX_LAYERED = 0x00080000L;
     public const long WS_EX_NOACTIVATE = 0x08000000L;
@@ -21,6 +24,10 @@ internal static unsafe partial class User32
     public const int SW_HIDE = 0;
     public const int SW_SHOWNA = 8;
     public const uint SMTO_NORMAL = 0x0000;
+    public const uint RDW_INVALIDATE = 0x0001;
+    public const uint RDW_ERASE = 0x0004;
+    public const uint RDW_ALLCHILDREN = 0x0080;
+    public const uint RDW_UPDATENOW = 0x0100;
     public const uint SPI_SETDESKWALLPAPER = 0x0014;
     public const uint SPI_GETDESKWALLPAPER = 0x0073;
     public const uint SPI_SETWORKAREA = 0x002F;
@@ -153,6 +160,18 @@ internal static unsafe partial class User32
 
     [LibraryImport("user32.dll", EntryPoint = "MessageBoxW", StringMarshalling = StringMarshalling.Utf16)]
     public static partial int MessageBox(nint hWnd, string text, string caption, uint type);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool RedrawWindow(nint hWnd, nint updateRect, nint updateRegion, uint flags);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool EnumWindows(delegate* unmanaged<nint, nint, int> callback, nint data);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool EnumChildWindows(nint parent, delegate* unmanaged<nint, nint, int> callback, nint data);
 
     public static string GetClassName(nint hWnd)
     {

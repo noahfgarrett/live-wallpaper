@@ -58,12 +58,21 @@ The rules are applied in this order:
 Steps for both layouts:
 1. Create the window hidden as `WS_POPUP` with `WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE`, so it never appears in Alt+Tab or the taskbar and never takes focus.
 2. Swap `WS_POPUP` for `WS_CHILD` (`SetWindowLongPtr(GWL_STYLE)`).
-3. Raised layout only: add `WS_EX_LAYERED`, then call `SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA)`.
+3. Raised layout only: add `WS_EX_LAYERED | WS_EX_TRANSPARENT`, then call `SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA)`.
+   - `WS_EX_TRANSPARENT` makes the window click-through. On 24H2 `SHELLDLL_DefView` is itself layered and may pass clicks through where it's transparent, and without this flag those clicks would land on our window instead of the desktop.
 4. `SetParent(hwnd, parent)`, then check that `GetParent(hwnd) == parent`.
 5. `SetWindowPos` to the monitor's rectangle in the parent's client coordinates: monitor bounds minus the parent client origin (`ClientToScreen(parent, {0,0})`), using `SWP_NOACTIVATE`.
    - Raised layout: `hWndInsertAfter = SHELLDLL_DefView`, which places us directly below it.
    - Legacy layout: `SWP_NOZORDER`.
-6. `ShowWindow(SW_SHOWNA)`.
+6. Check that `SetWindowPos` succeeded, then re-run the attachment check:
+   - correct parent;
+   - the window rectangle equals the monitor;
+   - on the raised layout, the window sits below `SHELLDLL_DefView` and above every `WorkerW` sibling.
+
+   If any check fails, the window is destroyed instead of shown. `SetParent` initially links the child at the top of Progman's children, above the icons, so showing it unchecked could cover them.
+7. `ShowWindow(SW_SHOWNA)`.
+
+All image decoding happens before any window is parented to Explorer. A cross-process parent/child pair shares input queues, so a slow decode while attached could stall desktop input.
 
 The two layouts also use different swap chains:
 - Legacy: a DXGI flip-model swap chain (`FLIP_DISCARD`).
@@ -73,13 +82,26 @@ The two layouts also use different swap chains:
 
 - **Explorer restart** (`TaskbarCreated` broadcast): our child windows are destroyed with Explorer's windows, so the engine tears down and attaches again.
 - **Display change** (`WM_DISPLAYCHANGE`, `WM_DPICHANGED`, work-area change): rebuild.
-- **Explorer re-ordering:** theme changes, wallpaper transitions and virtual-desktop switches have been reported to recreate or raise Explorer's `WorkerW` above ours. A 5-second timer checks that each window still has the expected parent, and on the raised layout that it is still directly below `SHELLDLL_DefView`. If not, it re-attaches.
+- **Explorer re-ordering or moving:** theme changes, wallpaper transitions and virtual-desktop switches have been reported to recreate or raise Explorer's `WorkerW` above ours, and display changes can move the parent after we've positioned the windows.
+  - A 5-second timer re-runs the attachment check. On the raised layout, the walk stops at any `WorkerW`, not just the one recorded earlier.
+  - If a window is lost, the engine rebuilds.
+  - If attaching itself fails, it retries with growing gaps (5 s up to 60 s).
+  - If there's simply nothing to show (missing images, monitors not connected), it waits for a reload or display change instead of retrying.
+- **Splitting:** `0x052C` is only sent when the desktop is actually unsplit, never on retries against an already split or half-started desktop.
+- **Enumeration:** windows are enumerated with `EnumWindows` / `EnumChildWindows`, not `GetWindow` loops, which can loop forever while windows are being destroyed (for example during an Explorer restart).
 
 ## Restoring the desktop
 
-On exit, the engine destroys its windows, then re-applies the current Windows wallpaper path with `SystemParametersInfo(SPI_SETDESKWALLPAPER, …, 0)`. Explorer repaints without anything being persisted. After a crash, a marker file makes the next start do the same restore first.
+This only happens when the engine actually split the desktop or attached a window.
+1. On exit, the engine destroys its windows.
+2. It asks `Progman` and every top-level `WorkerW` to repaint (`RedrawWindow` with invalidate, erase, all children and update now). This changes nothing.
+3. Only when `IDesktopWallpaper::GetStatus` reports that no slideshow is running does it also re-apply the current wallpaper path, with `SystemParametersInfo(SPI_SETDESKWALLPAPER, …, 0)` and no `SPIF_UPDATEINIFILE`. If the status can't be read, it skips this step rather than risk turning a slideshow into a fixed picture.
+
+On a crash, the handler tears down and restores the same way, but leaves the marker file in place, so the next start restores again before attaching.
 
 ## Known limitations
+
+- Windows Spotlight isn't reported as a slideshow. Re-applying its current image could switch the background type to "Picture" for the session. This is unverified, and covered by checklist item 15.
 
 - Everything above relies on undocumented Explorer behaviour.
 - Some early 24H2 builds reportedly hid live wallpapers unless "Show desktop icons" was enabled.

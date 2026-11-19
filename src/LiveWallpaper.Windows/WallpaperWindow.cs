@@ -23,10 +23,10 @@ public sealed unsafe class WallpaperWindow : IDisposable
         var instance = Kernel32.GetModuleHandle(null);
         EnsureClassRegistered(instance);
         var handle = User32.CreateWindowEx(
-            (uint)(User32.WS_EX_TOOLWINDOW | User32.WS_EX_NOACTIVATE),
+            (uint)(User32.WS_EX_TOOLWINDOW | User32.WS_EX_NOACTIVATE | User32.WS_EX_NOPARENTNOTIFY),
             ClassName,
             "Live Wallpaper",
-            unchecked((uint)User32.WS_POPUP),
+            unchecked((uint)(User32.WS_POPUP | User32.WS_CLIPSIBLINGS)),
             0, 0, 1, 1, 0, 0, instance, 0);
         if (handle == 0)
         {
