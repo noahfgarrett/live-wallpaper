@@ -10,6 +10,8 @@
         <EnableWindowsTargeting>true</EnableWindowsTargeting>
         <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
         <Deterministic>true</Deterministic>
+        <PublishDocumentationFile>false</PublishDocumentationFile>
+        <PublishReferencesDocumentationFiles>false</PublishReferencesDocumentationFiles>
     </PropertyGroup>
     <PropertyGroup Condition="$(TargetFramework.EndsWith('-windows'))">
         <PlatformTarget>x64</PlatformTarget>
