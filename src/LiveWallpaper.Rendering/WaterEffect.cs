@@ -25,6 +25,7 @@ public sealed class WaterEffect : IEffect
     private WaterSettings _settings = new();
     private WaterFrameConstants _constants;
     private double _phase;
+    private double _imageHeightPx;
     private bool _hasRegions;
 
     public WaterEffect(GpuDevice gpu)
@@ -53,6 +54,7 @@ public sealed class WaterEffect : IEffect
     {
         ArgumentNullException.ThrowIfNull(regions);
         var hasRegions = regions.Regions.Count > 0;
+        _imageHeightPx = imageBounds.Height;
         if (hasRegions)
         {
             _flow.Update(FlowField.Build(regions, imageBounds, targetPixels, WaterModel.MaxMistReachFraction * imageBounds.Height));
@@ -72,7 +74,7 @@ public sealed class WaterEffect : IEffect
         {
             return;
         }
-        WaterFrameBuilder.Build(_phase, settings, inputs.ImageDestination, targetPixels, ref _constants);
+        WaterFrameBuilder.Build(_phase, settings, inputs.ImageDestination, _imageHeightPx, targetPixels, _flow.PixelSize, ref _constants);
         var context = _gpu.Context;
         context.UpdateSubresource(in _constants, _frameBuffer);
         context.OMSetRenderTargets(target);

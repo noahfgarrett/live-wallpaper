@@ -96,8 +96,8 @@ The bead is placed so it stays inside its cell.
 **Shader**, in screen pixels `px`:
 - `q = (px·perp, px·dir) / scale`.
 - Phase noise: `n = Noise(q / (70, 140))`, `p0 = fract(phase + n)`, `p1 = fract(p0 + 0.5)`, and the cross-fade weight is `w = |2·p0 − 1|`.
-- Wobble across the flow: `perp × (Noise(q / (9, 30) − (0, 4·p0)) − 0.5) × 2 × scale`.
-- The two samples are `a = px − flow·C·p0 + wobble` and `b = px − flow·C·p1 + wobble`.
+- Wobble across the flow, per sample with its own phase p: `wobble(p) = perp × (Noise(q / (9, 30) − (0, 4·p)) − 0.5) × 2 × scale`.
+- The two samples are `a = px − flow·C·p0 + wobble(p0)` and `b = px − flow·C·p1 + wobble(p1)`, so each sample's wobble resets while its weight is 0.
 - Each sample is weighted by the water mask *at the sample point*: `wa = (1 − w) × mask(a)`, `wb = w × mask(b)`, plus `0.02 ×` the undisplaced pixel.
   - This stops rock above a waterfall being dragged into the water. It was the most visible artifact in tuning.
 - **Foam:**
@@ -109,12 +109,14 @@ The bead is placed so it stays inside its cell.
 **Noise:** value noise over the integer-hashed lattice (`Hash(x + 32768) × 0x10001 ^ Hash(y + 32768)`), smoothstep-interpolated. The inputs are screen pixels divided by fixed scales, so they stay small for any running time.
 
 **Mist** (`mist` = MistPct / 100):
-- `reach = (0.04 + 0.10 × mist) × displayed image height`.
+- `reach = (0.04 + 0.10 × mist) × displayed image height` (the whole source image as displayed, as for the flow speed).
 - **Plume:** for k = 1..6, with f = k/6 and `up = px − dir × reach × f`: `plume = max(plume, max(mask(up), mask(up ± perp × reach × f × 0.45)) × (1 − 0.8 f))`.
 - **Base:** `base = plume × (1 − mask(px + dir × reach × 0.3))`.
-- **Haze:** a two-phase cross-fade (`mp0 = fract(phase × 0.5 + 0.13)`) of `0.6 × Noise((s + (0, 38·mp) + dir·20·mp) / 46) + 0.4 × Noise((s + (0, 38·mp)) / 17)`, where `s = px / scale`.
+- **Haze:** a two-phase cross-fade (`mp0 = fract(phase + 0.13)`, `mp1 = fract(mp0 + 0.5)`, weight `|2·mp0 − 1|`) of `0.6 × Noise((s + (0, 19·mp) + dir·10·mp) / 46) + 0.4 × Noise((s + (0, 19·mp)) / 17)`, where `s = px / scale`. The mp1 octaves are offset by 7.3 and 3.1 so the two phases differ.
 - **Opacity:** `mistA = mist × smoothstep(0, 0.85, base) × (0.35 + 0.65 × haze) × 0.8`.
 - **Colour:** `lerp((0.9, 0.93, 0.97), photo × 0.5 + 0.55, 0.3)`.
 - **Output, premultiplied:** `rgb = water × m × (1 − mistA) + mistColour × mistA`, `a = m × (1 − mistA) + mistA`.
 - **Discard** when `m < 0.002 && mistA < 0.004`.
 - `dir` comes from the flow texture, which is dilated outside the regions to the nearest region's flow, up to 0.14 × the displayed image height.
+- The flow texture has one cell per 4 × 4 target pixels (`ceil(target / 4)` cells), so it is sampled at `px / (4 × flowSize)`, which maps exactly for any target size.
+- Where the flow is ≈ 0 (beyond the dilation), the pixel is discarded when `m < 0.002`; otherwise it is the mask's soft tail and draws as still water: `(photo × m, m)`.

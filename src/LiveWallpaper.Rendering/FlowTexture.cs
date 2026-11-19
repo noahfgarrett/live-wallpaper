@@ -58,6 +58,14 @@ public sealed class FlowTexture : IDisposable
         var desc = new Texture2DDescription(Format.R32G32_Float, (uint)size.Width, (uint)size.Height, 1, 1,
             BindFlags.ShaderResource, ResourceUsage.Default, CpuAccessFlags.None, 1, 0, ResourceOptionFlags.None);
         var texture = _gpu.Device.CreateTexture2D(desc);
-        return (texture, _gpu.Device.CreateShaderResourceView(texture));
+        try
+        {
+            return (texture, _gpu.Device.CreateShaderResourceView(texture));
+        }
+        catch
+        {
+            texture.Dispose();
+            throw;
+        }
     }
 }

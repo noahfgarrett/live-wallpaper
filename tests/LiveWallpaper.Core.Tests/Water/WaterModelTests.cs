@@ -129,15 +129,36 @@ public sealed class WaterModelTests
         var c = default(WaterFrameConstants);
         var dest = new RectangleF(100, 0, 1600, 900);
 
-        WaterFrameBuilder.Build(0.25, new WaterSettings(true, 100, 30, 50), dest, new Size(1920, 1080), ref c);
+        WaterFrameBuilder.Build(0.25, new WaterSettings(true, 100, 30, 50), dest, 1200, new Size(1920, 1080), new Size(480, 270), ref c);
 
         Assert.Equal(0.25f, c.Phase);
         Assert.Equal(3f, c.Cycle);
         Assert.Equal(0.3f, c.Foam, 5);
         Assert.Equal(0.5f, c.Mist, 5);
         Assert.Equal(1f, c.Scale, 5);
-        Assert.Equal((float)WaterModel.MistReachPx(50, 900), c.MistReach, 3);
         Assert.Equal(100f, c.ImageDest.X);
         Assert.Equal(1600f, c.ImageDest.Z);
+    }
+
+    [Fact]
+    public void FrameBuilder_MistReach_UsesTheWholeDisplayedImageHeight()
+    {
+        var c = default(WaterFrameConstants);
+
+        WaterFrameBuilder.Build(0, new WaterSettings(true, 50, 30, 50), new RectangleF(0, 0, 1920, 900), 1200, new Size(1920, 1080), new Size(480, 270), ref c);
+
+        Assert.Equal((float)WaterModel.MistReachPx(50, 1200), c.MistReach, 3);
+    }
+
+    [Fact]
+    public void FrameBuilder_FlowUvPerPx_MapsTargetPixelsOntoTheQuarterResolutionField()
+    {
+        var c = default(WaterFrameConstants);
+
+        // 1922 px is not a multiple of 4: the field is ceil(1922 / 4) = 481 cells, covering 1924 px.
+        WaterFrameBuilder.Build(0, new WaterSettings(), new RectangleF(0, 0, 1922, 1080), 1080, new Size(1922, 1080), new Size(481, 270), ref c);
+
+        Assert.Equal(1.0 / 1924, c.FlowUvPerPx.X, 9);
+        Assert.Equal(1.0 / 1080, c.FlowUvPerPx.Y, 9);
     }
 }

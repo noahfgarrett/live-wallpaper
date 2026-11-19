@@ -8,6 +8,8 @@ cbuffer Frame : register(b0)
     float scale;
     float mist;
     float mistReach;
+    float2 flowUvPerPx;
+    float2 padding;
 };
 
 Texture2D image : register(t0);
@@ -58,6 +60,11 @@ float MaskAt(float2 px)
     return regionMask.SampleLevel(linearClamp, px / resolution, 0).r;
 }
 
+float2 Wobble(float2 q, float2 perp, float p)
+{
+    return perp * (Noise(q / float2(9.0, 30.0) - float2(0.0, p * 4.0)) - 0.5) * 2.0 * scale;
+}
+
 float4 VSMain(uint id : SV_VertexID) : SV_Position
 {
     float2 p = float2(float((id << 1) & 2u), float(id & 2u));
@@ -67,15 +74,20 @@ float4 VSMain(uint id : SV_VertexID) : SV_Position
 float4 PSMain(float4 position : SV_Position) : SV_Target
 {
     float2 px = position.xy;
-    float2 flow = flowField.SampleLevel(linearClamp, px / resolution, 0).rg;
+    float2 flow = flowField.SampleLevel(linearClamp, px * flowUvPerPx, 0).rg;
     float speed = length(flow);
+    float m = MaskAt(px);
     if (speed < 1e-3)
     {
-        discard;
+        // Beyond the flow field's reach: nothing, or the mask's soft tail as still water.
+        if (m < 0.002)
+        {
+            discard;
+        }
+        return float4(Img(px) * m, m);
     }
     float2 dir = flow / speed;
     float2 perp = float2(-dir.y, dir.x);
-    float m = MaskAt(px);
 
     // Mist: water upstream within reach, and no water just downstream (the base of the fall).
     float plume = 0.0;
@@ -89,12 +101,12 @@ float4 PSMain(float4 position : SV_Position) : SV_Target
     }
     float base = plume * (1.0 - MaskAt(px + dir * mistReach * 0.3));
     float2 sq = px / scale;
-    float rise = 38.0;
-    float mp0 = frac(phase * 0.5 + 0.13);
+    float rise = 19.0;
+    float mp0 = frac(phase + 0.13);
     float mp1 = frac(mp0 + 0.5);
     float mw = abs(2.0 * mp0 - 1.0);
-    float n0 = Noise((sq + float2(0.0, rise * mp0) + dir * 20.0 * mp0) / 46.0) * 0.6 + Noise((sq + float2(0.0, rise * mp0)) / 17.0) * 0.4;
-    float n1 = Noise((sq + float2(0.0, rise * mp1) + dir * 20.0 * mp1) / 46.0 + 7.3) * 0.6 + Noise((sq + float2(0.0, rise * mp1)) / 17.0 + 3.1) * 0.4;
+    float n0 = Noise((sq + float2(0.0, rise * mp0) + dir * 10.0 * mp0) / 46.0) * 0.6 + Noise((sq + float2(0.0, rise * mp0)) / 17.0) * 0.4;
+    float n1 = Noise((sq + float2(0.0, rise * mp1) + dir * 10.0 * mp1) / 46.0 + 7.3) * 0.6 + Noise((sq + float2(0.0, rise * mp1)) / 17.0 + 3.1) * 0.4;
     float haze = lerp(n0, n1, mw);
     float mistA = mist * smoothstep(0.0, 0.85, base) * (0.35 + 0.65 * haze) * 0.8;
     if (m < 0.002 && mistA < 0.004)
@@ -109,9 +121,9 @@ float4 PSMain(float4 position : SV_Position) : SV_Target
     float p0 = frac(phase + n);
     float p1 = frac(p0 + 0.5);
     float fade = abs(2.0 * p0 - 1.0);
-    float2 wobble = perp * (Noise(q / float2(9.0, 30.0) - float2(0.0, p0 * 4.0)) - 0.5) * 2.0 * scale;
-    float2 a = px - travel * p0 + wobble;
-    float2 b = px - travel * p1 + wobble;
+    // Each sample wobbles with its own phase, so its reset happens while its weight is 0.
+    float2 a = px - travel * p0 + Wobble(q, perp, p0);
+    float2 b = px - travel * p1 + Wobble(q, perp, p1);
     float3 still = Img(px);
 
     // Samples that land outside the water (rock above a waterfall) are dropped, so nothing foreign is dragged in.
