@@ -9,6 +9,8 @@
         <NoWarn>$(NoWarn);CS1591</NoWarn>
         <EnableWindowsTargeting>true</EnableWindowsTargeting>
         <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+        <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+        <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
         <Deterministic>true</Deterministic>
         <PublishDocumentationFile>false</PublishDocumentationFile>
         <PublishReferencesDocumentationFiles>false</PublishReferencesDocumentationFiles>
