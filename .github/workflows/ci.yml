@@ -29,8 +29,19 @@ jobs:
             - name: Test
               run: dotnet test -c Release --no-build
 
-            - name: Publish engine
-              run: dotnet publish src/LiveWallpaper.Engine -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:DebugType=embedded -o artifacts/LiveWallpaper
+            - name: Publish engine and app
+              run: |
+                  dotnet publish src/LiveWallpaper.Engine -c Release -r win-x64 --self-contained -p:DebugType=embedded -o artifacts/LiveWallpaper
+                  dotnet publish src/LiveWallpaper.App -c Release -r win-x64 --self-contained -p:DebugType=embedded -o artifacts/LiveWallpaper
+
+            - name: Smoke test the engine
+              shell: pwsh
+              run: |
+                  foreach ($exe in 'LiveWallpaper.exe', 'LiveWallpaper.Engine.exe') {
+                      if (-not (Test-Path "artifacts/LiveWallpaper/$exe")) { throw "$exe is missing from the build" }
+                  }
+                  $p = Start-Process -FilePath artifacts/LiveWallpaper/LiveWallpaper.Engine.exe -ArgumentList '--list-monitors' -Wait -PassThru
+                  if ($p.ExitCode -ne 0) { throw "LiveWallpaper.Engine.exe --list-monitors exited with $($p.ExitCode)" }
 
             - name: Upload build
               uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
