@@ -34,7 +34,7 @@ Rain uses the same stateless instancing as snow: hash randoms per instance, a la
 
 **Look**
 - Cross-section: `(1 − |2u − 1|)²`.
-- Along the streak: `smoothstep(0, 0.25, v) × smoothstep(1, 0.45, v)`, where v = 0 at the tail end.
+- Along the streak: `smoothstep(0, 0.25, v) × smoothstep(1, 0.45, v)`, where v = 0 at the head.
 - Colour: (0.82, 0.87, 0.94), premultiplied.
 - The streak doesn't take its colour from the photo. Low premultiplied alpha already makes rain near-invisible on a bright sky and visible on dark backgrounds, as in real rain photos.
 

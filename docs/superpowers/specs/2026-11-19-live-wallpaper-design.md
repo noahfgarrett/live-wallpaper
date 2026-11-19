@@ -149,6 +149,8 @@ interface IEffect : IDisposable
 
 Each effect has its own settings record (JSON-serialized with a type discriminator), its own shaders, and is registered in a small static registry. A wallpaper holds an ordered list of **effect instances**; each instance has its own settings and its own region set (section 5.8). Adding rain later = one new `IEffect` plus its settings record, no engine changes.
 
+**Update (Milestone 5):** the ordered list of instances wasn't built. Each library item holds fixed effect slots instead (Snow, Rain, Glass and Water), each with its own settings and its own region set, drawn in a fixed order. A slot has the same settings-plus-regions shape a list entry would have, so it can grow into the list later without breaking saved files. See [the Milestone 5 design](2026-11-19-m5-rain-glass-water-design.md), section 4.
+
 ### 5.7 Snowfall
 
 GPU-instanced, **stateless** particles: each flake's position is computed in the vertex shader from its index, a per-flake random seed, and a few per-frame constants. Zero per-frame allocations, no CPU particle loop, recycling is a modulo wrap.
@@ -235,7 +237,7 @@ Engine-owned `Shell_NotifyIcon` with a Win32 popup menu: Open Live Wallpaper, Pa
 
 ## 9. After v1 (planned, not built now)
 
-- **Rain** (first new effect), including **rain on glass** using 4-point plane regions: streaks and droplets that refract the image behind them.
+- **Rain** (first new effect), including **rain on glass** using 4-point plane regions: streaks and droplets that refract the image behind them. **Built in Milestone 5**, together with **flowing water** (with mist); see [the Milestone 5 design](2026-11-19-m5-rain-glass-water-design.md).
 - **Smart selection:** click a point to get a suggested region outline from a compact Segment Anything model (e.g. MobileSAM, Apache-2.0) via ONNX Runtime + DirectML. The outline is converted to an editable polygon. Runs only in the editor; the model is downloaded on explicit user action.
 - **Depth-aware effects:** a depth-estimation model (e.g. Depth Anything V2 Small, Apache-2.0) computes a depth map once per image, letting snow fall between foreground and background objects.
 - Fog, fireflies, floating particles, leaves, twinkling lights, clouds, aurora, lighting.
