@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
 using LiveWallpaper.Core.Ipc;
 using LiveWallpaper.Core.Models;
 using LiveWallpaper.Core.Regions;
@@ -14,10 +15,13 @@ public sealed class IpcTests
     [
         new ApplyWallpaper(Guid.NewGuid(), "all", WallpaperScaling.Fit),
         new UpdateSnow(Guid.NewGuid(), new SnowSettings(DensityPct: 75, MotionBlur: true)),
-        new UpdateRegions(Guid.NewGuid(), new RegionSet(
+        new UpdateRegions(Guid.NewGuid(), EffectKind.Snow, new RegionSet(
             [RegionGeometry.CreateQuad(), new Region([new(0.1, 0.1), new(0.3, 0.1), new(0.2, 0.4)])],
             Invert: true,
             FeatherPct: 3.5)),
+        new UpdateRain(Guid.NewGuid(), new RainSettings(Enabled: true, DensityPct: 80, WindPct: 35)),
+        new UpdateGlass(Guid.NewGuid(), new GlassSettings()),
+        new UpdateWater(Guid.NewGuid(), new WaterSettings()),
         new SetPaused(true),
         new SetPreferences(FrameRateMode.Adaptive, WallpaperScaling.Center, false),
         new GetStatus(),
@@ -36,6 +40,40 @@ public sealed class IpcTests
         var read = await PipeFraming.ReadAsync(stream, IpcJsonContext.Default.EngineRequest, TestContext.Current.CancellationToken);
 
         Assert.Equal(request, read);
+    }
+
+    [Fact]
+    public async Task UpdateRegions_RoundTripCarriesEffect()
+    {
+        var request = new UpdateRegions(Guid.NewGuid(), EffectKind.Water, new RegionSet([RegionGeometry.CreateQuad()], Invert: false, FeatherPct: 2));
+        using var stream = new MemoryStream();
+        await PipeFraming.WriteAsync<EngineRequest>(stream, request, IpcJsonContext.Default.EngineRequest, TestContext.Current.CancellationToken);
+
+        Assert.Contains("\"effect\":\"water\"", Encoding.UTF8.GetString(stream.ToArray()));
+        stream.Position = 0;
+        Assert.Equal(request, await PipeFraming.ReadAsync(stream, IpcJsonContext.Default.EngineRequest, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public void Status_WithoutProtocolVersion_ReadsAsZero()
+    {
+        const string json = """
+            {"type":"status","status":{"isPaused":false,"fps":30,"privateBytes":1000,"cpuPercent":1.5,"activeParticles":0,"monitors":[],"settings":{},"problem":null}}
+            """;
+
+        var response = JsonSerializer.Deserialize(json, IpcJsonContext.Default.EngineResponse);
+
+        var report = Assert.IsType<StatusReport>(response);
+        Assert.Equal(0, report.Status.ProtocolVersion);
+    }
+
+    [Fact]
+    public void NeedsReplacement_TrueForZero_FalseForCurrent()
+    {
+        var old = new EngineStatus(false, 0, 0, 0, 0, [], new AppSettings(), null);
+
+        Assert.True(EngineProtocol.NeedsReplacement(old));
+        Assert.False(EngineProtocol.NeedsReplacement(old with { ProtocolVersion = EngineProtocol.Current }));
     }
 
     [Fact]

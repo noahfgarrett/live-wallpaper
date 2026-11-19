@@ -339,7 +339,7 @@ public partial class EditorView : UserControl
 
     private Task SendLiveAsync(SnowSettings snow) => _engine.SendAsync(new UpdateSnow(_item.Id, snow), CancellationToken.None);
 
-    private Task SendRegionsAsync(RegionSet regions) => _engine.SendAsync(new UpdateRegions(_item.Id, regions), CancellationToken.None);
+    private Task SendRegionsAsync(RegionSet regions) => _engine.SendAsync(new UpdateRegions(_item.Id, EffectKind.Snow, regions), CancellationToken.None);
 
     private void UpdateLabels()
     {
