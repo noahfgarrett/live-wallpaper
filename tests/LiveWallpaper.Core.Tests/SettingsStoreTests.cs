@@ -6,6 +6,8 @@ namespace LiveWallpaper.Core.Tests;
 public sealed class SettingsStoreTests : IDisposable
 {
     private static readonly DateTimeOffset Now = new(2026, 11, 19, 8, 36, 0, TimeSpan.Zero);
+    private static readonly Guid ItemA = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    private static readonly Guid ItemB = Guid.Parse("22222222-2222-2222-2222-222222222222");
     private readonly TempDirectory _dir = new();
     private readonly SettingsStore _store;
 
@@ -16,6 +18,8 @@ public sealed class SettingsStoreTests : IDisposable
 
     public void Dispose() => _dir.Dispose();
 
+    private void WriteRaw(string json) => File.WriteAllText(_dir.File("settings.json"), json);
+
     [Fact]
     public void Load_WhenFileMissing_ReturnsDefaultsWithMissingOutcome()
     {
@@ -23,7 +27,9 @@ public sealed class SettingsStoreTests : IDisposable
 
         Assert.Equal(SettingsLoadOutcome.Missing, result.Outcome);
         Assert.Empty(result.Settings.Monitors);
-        Assert.Equal(1, result.Settings.SchemaVersion);
+        Assert.Equal(2, result.Settings.SchemaVersion);
+        Assert.Equal(FrameRateMode.Fps60, result.Settings.FrameRate);
+        Assert.True(result.Settings.KeepRunningWhenAppCloses);
     }
 
     [Fact]
@@ -33,8 +39,8 @@ public sealed class SettingsStoreTests : IDisposable
         {
             Monitors =
             [
-                new MonitorAssignment("MON-A", @"C:\Pictures\a.jpg", WallpaperScaling.Fill),
-                new MonitorAssignment("MON-B", @"C:\Pictures\b.png", WallpaperScaling.Fit),
+                new MonitorAssignment("MON-A", ItemA, WallpaperScaling.Fill),
+                new MonitorAssignment("MON-B", ItemB, WallpaperScaling.Fit),
             ],
         };
 
@@ -46,9 +52,22 @@ public sealed class SettingsStoreTests : IDisposable
     }
 
     [Fact]
+    public void Settings_RoundTripsFrameRateAndPreferences()
+    {
+        _store.Save(new AppSettings { FrameRate = FrameRateMode.Adaptive, DefaultScaling = WallpaperScaling.Center, KeepRunningWhenAppCloses = false });
+
+        var loaded = _store.Load().Settings;
+
+        Assert.Equal(FrameRateMode.Adaptive, loaded.FrameRate);
+        Assert.Equal(WallpaperScaling.Center, loaded.DefaultScaling);
+        Assert.False(loaded.KeepRunningWhenAppCloses);
+        Assert.Contains("\"frameRate\": \"adaptive\"", File.ReadAllText(_dir.File("settings.json")));
+    }
+
+    [Fact]
     public void Save_WritesScalingAsLowercaseString()
     {
-        _store.Save(new AppSettings { Monitors = [new MonitorAssignment("M", "a.jpg", WallpaperScaling.Center)] });
+        _store.Save(new AppSettings { Monitors = [new MonitorAssignment("M", ItemA, WallpaperScaling.Center)] });
 
         Assert.Contains("\"scaling\": \"center\"", File.ReadAllText(_dir.File("settings.json")));
     }
@@ -56,7 +75,7 @@ public sealed class SettingsStoreTests : IDisposable
     [Fact]
     public void Load_WhenJsonCorrupt_BacksUpAndReturnsDefaults()
     {
-        File.WriteAllText(_dir.File("settings.json"), "{ not json");
+        WriteRaw("{ not json");
 
         var result = _store.Load();
 
@@ -68,10 +87,24 @@ public sealed class SettingsStoreTests : IDisposable
     }
 
     [Fact]
-    public void Load_WhenScalingUnknown_TreatsAsCorrupt()
+    public void SettingsV1File_IsTreatedAsCorrupt()
     {
-        File.WriteAllText(_dir.File("settings.json"),
-            """{ "schemaVersion": 1, "monitors": [ { "monitorId": "M", "imagePath": "a.jpg", "scaling": "zoom" } ] }""");
+        WriteRaw("""{ "schemaVersion": 1, "monitors": [ { "monitorId": "M", "imagePath": "a.jpg", "scaling": "fill" } ] }""");
+
+        Assert.Equal(SettingsLoadOutcome.CorruptReplaced, _store.Load().Outcome);
+    }
+
+    [Theory]
+    [InlineData("""{ "schemaVersion": 2, "monitors": [ { "monitorId": "M", "libraryItemId": "11111111-1111-1111-1111-111111111111", "scaling": "zoom" } ] }""")]
+    [InlineData("""{ "schemaVersion": 2, "monitors": [ { "monitorId": "M", "libraryItemId": "11111111-1111-1111-1111-111111111111", "scaling": 7 } ] }""")]
+    [InlineData("""{ "schemaVersion": 2, "monitors": [ null ] }""")]
+    [InlineData("""{ "schemaVersion": 2, "monitors": [ { "monitorId": " ", "libraryItemId": "11111111-1111-1111-1111-111111111111", "scaling": "fill" } ] }""")]
+    [InlineData("""{ "schemaVersion": 2, "monitors": [ { "monitorId": "M", "libraryItemId": "00000000-0000-0000-0000-000000000000", "scaling": "fill" } ] }""")]
+    [InlineData("""{ "schemaVersion": 2, "monitors": [ { "monitorId": "M", "scaling": "fill" } ] }""")]
+    [InlineData("""{ "schemaVersion": 2, "frameRate": "fps144" }""")]
+    public void Load_WhenSemanticallyInvalid_TreatsAsCorrupt(string json)
+    {
+        WriteRaw(json);
 
         Assert.Equal(SettingsLoadOutcome.CorruptReplaced, _store.Load().Outcome);
     }
@@ -79,21 +112,12 @@ public sealed class SettingsStoreTests : IDisposable
     [Fact]
     public void Load_WhenMonitorsNull_ReturnsEmptyList()
     {
-        File.WriteAllText(_dir.File("settings.json"), """{ "schemaVersion": 1, "monitors": null }""");
+        WriteRaw("""{ "schemaVersion": 2, "monitors": null }""");
 
         var result = _store.Load();
 
         Assert.Equal(SettingsLoadOutcome.Loaded, result.Outcome);
         Assert.Empty(result.Settings.Monitors);
-    }
-
-    [Fact]
-    public void Load_WhenAssignmentMissingImagePath_TreatsAsCorrupt()
-    {
-        File.WriteAllText(_dir.File("settings.json"),
-            """{ "schemaVersion": 1, "monitors": [ { "monitorId": "M", "scaling": "fill" } ] }""");
-
-        Assert.Equal(SettingsLoadOutcome.CorruptReplaced, _store.Load().Outcome);
     }
 
     [Fact]
@@ -112,31 +136,5 @@ public sealed class SettingsStoreTests : IDisposable
         nested.Save(new AppSettings());
 
         Assert.True(File.Exists(Path.Combine(_dir.Path, "a", "b", "settings.json")));
-    }
-
-    [Fact]
-    public void Load_WhenMonitorEntryNull_TreatsAsCorrupt()
-    {
-        File.WriteAllText(_dir.File("settings.json"), """{ "schemaVersion": 1, "monitors": [ null ] }""");
-
-        Assert.Equal(SettingsLoadOutcome.CorruptReplaced, _store.Load().Outcome);
-    }
-
-    [Fact]
-    public void Load_WhenScalingNumeric_TreatsAsCorrupt()
-    {
-        File.WriteAllText(_dir.File("settings.json"),
-            """{ "schemaVersion": 1, "monitors": [ { "monitorId": "M", "imagePath": "a.jpg", "scaling": 7 } ] }""");
-
-        Assert.Equal(SettingsLoadOutcome.CorruptReplaced, _store.Load().Outcome);
-    }
-
-    [Fact]
-    public void Load_WhenMonitorIdEmpty_TreatsAsCorrupt()
-    {
-        File.WriteAllText(_dir.File("settings.json"),
-            """{ "schemaVersion": 1, "monitors": [ { "monitorId": " ", "imagePath": "a.jpg", "scaling": "fill" } ] }""");
-
-        Assert.Equal(SettingsLoadOutcome.CorruptReplaced, _store.Load().Outcome);
     }
 }

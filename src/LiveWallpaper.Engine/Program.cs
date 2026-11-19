@@ -2,6 +2,7 @@ using System.Text.Json;
 using LiveWallpaper.Core;
 using LiveWallpaper.Core.Desktop;
 using LiveWallpaper.Core.Diagnostics;
+using LiveWallpaper.Core.Library;
 using LiveWallpaper.Core.Models;
 using LiveWallpaper.Core.Settings;
 using LiveWallpaper.Media;
@@ -86,9 +87,10 @@ public static class Program
     private static int SetWallpaper(EngineCommand.SetWallpaper set)
     {
         var imagePath = Path.GetFullPath(set.ImagePath);
+        System.Drawing.Size size;
         try
         {
-            WicImageLoader.ReadSize(imagePath);
+            size = WicImageLoader.ReadSize(imagePath);
         }
         catch (ImageLoadException ex)
         {
@@ -96,13 +98,14 @@ public static class Program
         }
 
         var monitors = MonitorEnumerator.Enumerate();
+        var item = new LibraryStore(AppPaths.LibraryDirectory, TimeProvider.System).Import(imagePath, size.Width, size.Height);
         var store = new SettingsStore(AppPaths.SettingsFile, TimeProvider.System);
         var current = store.Load().Settings;
 
         IReadOnlyList<MonitorAssignment> assignments;
         if (string.Equals(set.MonitorSelector, EngineCommandParser.AllMonitors, StringComparison.OrdinalIgnoreCase))
         {
-            assignments = monitors.Select(m => new MonitorAssignment(m.Id, imagePath, set.Scaling)).ToList();
+            assignments = monitors.Select(m => new MonitorAssignment(m.Id, item.Id, set.Scaling)).ToList();
         }
         else
         {
@@ -113,7 +116,7 @@ public static class Program
             }
             assignments = current.Monitors
                 .Where(a => !string.Equals(a.MonitorId, monitor.Id, StringComparison.OrdinalIgnoreCase))
-                .Append(new MonitorAssignment(monitor.Id, imagePath, set.Scaling))
+                .Append(new MonitorAssignment(monitor.Id, item.Id, set.Scaling))
                 .ToList();
         }
 

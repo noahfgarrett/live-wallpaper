@@ -43,11 +43,17 @@ public sealed class SettingsStore(string filePath, TimeProvider timeProvider)
 
     private static void Validate(AppSettings settings)
     {
+        if (settings.SchemaVersion != AppSettings.CurrentSchemaVersion
+            || !Enum.IsDefined(settings.FrameRate)
+            || !Enum.IsDefined(settings.DefaultScaling))
+        {
+            throw new JsonException("Unsupported settings version or value.");
+        }
         foreach (var assignment in settings.Monitors)
         {
             if (assignment is null
                 || string.IsNullOrWhiteSpace(assignment.MonitorId)
-                || string.IsNullOrWhiteSpace(assignment.ImagePath)
+                || assignment.LibraryItemId == Guid.Empty
                 || !Enum.IsDefined(assignment.Scaling))
             {
                 throw new JsonException("Settings file contains an invalid monitor assignment.");

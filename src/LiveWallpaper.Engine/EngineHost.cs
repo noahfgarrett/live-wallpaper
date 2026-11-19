@@ -3,6 +3,7 @@ using LiveWallpaper.Core;
 using LiveWallpaper.Core.Desktop;
 using LiveWallpaper.Core.Diagnostics;
 using LiveWallpaper.Core.Geometry;
+using LiveWallpaper.Core.Library;
 using LiveWallpaper.Core.Models;
 using LiveWallpaper.Core.Settings;
 using LiveWallpaper.Media;
@@ -20,6 +21,7 @@ public sealed class EngineHost
     private readonly GpuDevice _gpu;
     private readonly ImageQuadRenderer _renderer;
     private readonly SettingsStore _store;
+    private readonly LibraryStore _library = new(AppPaths.LibraryDirectory, TimeProvider.System);
     private readonly AttachRetryPolicy _retry = new();
     private readonly List<ActiveWallpaper> _wallpapers = [];
     private readonly int _uiThreadId = Environment.CurrentManagedThreadId;
@@ -154,7 +156,7 @@ public sealed class EngineHost
             Log.Error("engine", $"event=settings-corrupt backup=\"{Path.GetFileName(load.BackupPath)}\"");
         }
 
-        var prepared = PrepareImages(load.Settings.Monitors);
+        var prepared = PrepareImages(load.Settings.Monitors, _library.Load());
         if (prepared.Count == 0)
         {
             Log.Info("engine", $"event=nothing-to-show assignments={load.Settings.Monitors.Count}");
@@ -188,7 +190,7 @@ public sealed class EngineHost
         return true;
     }
 
-    private List<PreparedImage> PrepareImages(IReadOnlyList<MonitorAssignment> assignments)
+    private List<PreparedImage> PrepareImages(IReadOnlyList<MonitorAssignment> assignments, IReadOnlyList<LibraryItem> library)
     {
         var prepared = new List<PreparedImage>();
         foreach (var monitor in MonitorEnumerator.Enumerate())
@@ -198,12 +200,19 @@ public sealed class EngineHost
             {
                 continue;
             }
+            var item = library.FirstOrDefault(i => i.Id == assignment.LibraryItemId);
+            if (item is null)
+            {
+                Log.Info("engine", $"event=monitor-skipped reason=library-item-missing monitor=\"{monitor.DeviceName}\"");
+                continue;
+            }
             try
             {
                 var target = monitor.Bounds.Size;
-                var imageSize = WicImageLoader.ReadSize(assignment.ImagePath);
+                var imagePath = _library.ImagePath(item);
+                var imageSize = WicImageLoader.ReadSize(imagePath);
                 var crop = ScalingMath.ComputeSourceCrop(imageSize, target, assignment.Scaling);
-                var image = WicImageLoader.Load(assignment.ImagePath, crop, ScalingMath.ComputeDecodeSize(imageSize, target, assignment.Scaling));
+                var image = WicImageLoader.Load(imagePath, crop, ScalingMath.ComputeDecodeSize(imageSize, target, assignment.Scaling));
                 var texture = _gpu.CreateImageTexture(image);
                 prepared.Add(new PreparedImage(monitor, texture, ScalingMath.ComputeDestination(crop.Size, target, assignment.Scaling)));
                 Log.Info("engine", $"event=decoded monitor=\"{monitor.DeviceName}\" image={imageSize.Width}x{imageSize.Height} decoded={image.Width}x{image.Height} scaling={assignment.Scaling}");
