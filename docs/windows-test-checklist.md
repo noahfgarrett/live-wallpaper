@@ -111,8 +111,11 @@ Start fresh: run `LiveWallpaper.Engine.exe --stop` from an older build if one is
 
 ## Milestone 4: effect regions
 
-Use the v0.3.0-m4 zip. Stop the older engine first (tray → **Exit**), then open **LiveWallpaper.exe**. Pick a photo with a window or a clear sky, and open it in the editor.
+Use the v0.3.1-m4 zip. Pick a photo with a window or a clear sky, and open it in the editor.
 
+0. **Upgrade over a running older engine.** Start an older build's engine (for example `LiveWallpaper.Engine.exe` from v0.1.0-m1 or v0.2.0-m3) and leave it running. Then, without stopping it, open **LiveWallpaper.exe** from the new zip.
+   - Expected: within about 10 seconds the status line turns green and the old engine is gone from Task Manager (one `LiveWallpaper.Engine` process remains, from the new folder). Applying an image works. You never see "The wallpaper engine couldn't be started."
+   - Result:
 1. **Old library.** Before anything else, check the library from v0.2.0-m3.
    - Expected: every image is still there with its snow settings. Nothing was reset.
    - Result:
