@@ -6,6 +6,8 @@ namespace LiveWallpaper.Rendering;
 
 public sealed class WallpaperSurface : IDisposable
 {
+    private const int DxgiStatusOccluded = 0x087A0001;
+
     private readonly GpuDevice _gpu;
     private readonly IDXGISwapChain1 _swapChain;
     private readonly uint _bufferCount;
@@ -50,7 +52,12 @@ public sealed class WallpaperSurface : IDisposable
         PixelSize = pixelSize;
     }
 
-    public void Present(uint syncInterval = 1) => _swapChain.Present(syncInterval, PresentFlags.None).CheckError();
+    public bool Present(uint syncInterval = 1)
+    {
+        var result = _swapChain.Present(syncInterval, PresentFlags.None);
+        result.CheckError();
+        return result.Code != DxgiStatusOccluded;
+    }
 
     public void Dispose()
     {
