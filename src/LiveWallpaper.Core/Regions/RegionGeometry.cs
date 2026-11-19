@@ -26,7 +26,7 @@ public static class RegionGeometry
     public static Region MoveVertex(Region region, int index, RegionPoint p, NormalizedRect bounds)
     {
         var clamped = bounds.Clamp(p);
-        return new Region(region.Points.Select((q, i) => i == index ? clamped : q).ToArray());
+        return region with { Points = region.Points.Select((q, i) => i == index ? clamped : q).ToArray() };
     }
 
     /// <summary>Adds a point after <c>Points[edgeIndex]</c>. Does nothing when the region already has the most points allowed.</summary>
@@ -38,7 +38,7 @@ public static class RegionGeometry
         }
         var points = region.Points.ToList();
         points.Insert(edgeIndex + 1, NormalizedRect.Unit.Clamp(p));
-        return new Region(points);
+        return region with { Points = points };
     }
 
     /// <summary>Removes a point, keeping at least <see cref="MinPoints"/>.</summary>
@@ -48,7 +48,7 @@ public static class RegionGeometry
         {
             return region;
         }
-        return new Region(region.Points.Where((_, i) => i != index).ToArray());
+        return region with { Points = region.Points.Where((_, i) => i != index).ToArray() };
     }
 
     /// <summary>
@@ -67,7 +67,7 @@ public static class RegionGeometry
         {
             return region;
         }
-        return new Region(region.Points.Select(p => new RegionPoint(p.X + cdx, p.Y + cdy)).ToArray());
+        return region with { Points = region.Points.Select(p => new RegionPoint(p.X + cdx, p.Y + cdy)).ToArray() };
     }
 
     /// <summary>The closest edge within <paramref name="maxDistance"/> of <paramref name="p"/>, including the closing edge.</summary>

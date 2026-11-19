@@ -252,4 +252,115 @@ public sealed class LibraryStoreTests : IDisposable
 
         Assert.Equal("Renamed", Assert.Single(_store.LoadReadOnly()).DisplayName);
     }
+
+    private const string M4Item = """
+        {
+            "schemaVersion": 1,
+            "items": [
+                {
+                    "id": "6f1d2c3b-4a59-4e6f-8a7b-9c0d1e2f3a4b",
+                    "displayName": "Cabin",
+                    "fileName": "source.jpg",
+                    "importedAt": "2026-11-19T08:36:00+00:00",
+                    "pixelWidth": 4000,
+                    "pixelHeight": 3000,
+                    "snow": {
+                        "enabled": true,
+                        "densityPct": 50,
+                        "speedPct": 50,
+                        "windPct": 30,
+                        "sizePct": 50,
+                        "motionBlur": false
+                    },
+                    "regions": {
+                        "regions": [
+                            { "points": [ { "x": 0.1, "y": 0.1 }, { "x": 0.5, "y": 0.1 }, { "x": 0.3, "y": 0.5 } ] }
+                        ],
+                        "invert": true,
+                        "featherPct": 2
+                    }
+                }
+            ]
+        }
+        """;
+
+    private void WriteLibrary(string json)
+    {
+        var folder = Path.Combine(_dir.Path, "library");
+        Directory.CreateDirectory(folder);
+        File.WriteAllText(Path.Combine(folder, "library.json"), json);
+    }
+
+    [Fact]
+    public void Load_LibraryFromM4WithoutEffects_KeepsSnowRegionsAndTurnsNewEffectsOff()
+    {
+        WriteLibrary(M4Item);
+
+        var item = Assert.Single(_store.Load());
+
+        Assert.True(item.Snow.Enabled);
+        Assert.Single(item.Regions.Regions);
+        Assert.True(item.Regions.Invert);
+        Assert.Equal(2, item.Regions.FeatherPct);
+        Assert.Equal(RainSlot.Default, item.Rain);
+        Assert.Equal(GlassSlot.Default, item.Glass);
+        Assert.Equal(WaterSlot.Default, item.Water);
+        Assert.False(item.Rain.Settings.Enabled);
+        Assert.False(item.Glass.Settings.Enabled);
+        Assert.False(item.Water.Settings.Enabled);
+    }
+
+    [Fact]
+    public void RoundTrip_AllSlots()
+    {
+        var item = _store.Import(SourceFile(), 1920, 1080) with
+        {
+            Rain = new RainSlot(new RainSettings(true, 10, 20, 30, 40, 60), new RegionSet([new Region([new(0.1, 0.1), new(0.5, 0.1), new(0.3, 0.5)])], true, 3)),
+            Glass = new GlassSlot(new GlassSettings(true, 11, 22, 33, 44), new RegionSet([RegionGeometry.CreateQuad()], false, 2)),
+            Water = new WaterSlot(new WaterSettings(true, 70, 80), new RegionSet([new Region([new(0.1, 0.6), new(0.9, 0.6), new(0.9, 0.9)]) { Flow = new RegionPoint(0.25, -0.1) }])),
+        };
+        _store.Update(item);
+
+        var loaded = Assert.Single(_store.Load());
+
+        Assert.Equal(item.Rain, loaded.Rain);
+        Assert.Equal(item.Glass, loaded.Glass);
+        Assert.Equal(item.Water, loaded.Water);
+        Assert.Equal(new RegionPoint(0.25, -0.1), loaded.Water.Regions.Regions[0].Flow);
+    }
+
+    [Fact]
+    public void Load_WaterRegionWithoutFlow_GetsDefaultArrow()
+    {
+        WriteLibrary(M4Item.Replace(
+            "\"regions\": {",
+            "\"water\": { \"settings\": { \"enabled\": true, \"stretchPct\": 50, \"foamPct\": 30 }, \"regions\": { \"regions\": [ { \"points\": [ { \"x\": 0.1, \"y\": 0.1 }, { \"x\": 0.5, \"y\": 0.1 }, { \"x\": 0.3, \"y\": 0.5 } ] } ], \"invert\": false, \"featherPct\": 1 } }, \"regions\": {"));
+
+        var item = Assert.Single(_store.Load());
+
+        Assert.Equal(EffectRules.DefaultFlow, Assert.Single(item.Water.Regions.Regions).Flow);
+    }
+
+    [Fact]
+    public void Load_GlassRegionWithFivePoints_IsDropped()
+    {
+        WriteLibrary(M4Item.Replace(
+            "\"regions\": {",
+            "\"glass\": { \"settings\": { \"enabled\": true, \"dropsPct\": 50, \"dropSizePct\": 50, \"slidingPct\": 40, \"fogPct\": 30 }, \"regions\": { \"regions\": [ { \"points\": [ { \"x\": 0.1, \"y\": 0.1 }, { \"x\": 0.5, \"y\": 0.1 }, { \"x\": 0.6, \"y\": 0.3 }, { \"x\": 0.5, \"y\": 0.5 }, { \"x\": 0.1, \"y\": 0.5 } ] } ], \"invert\": false, \"featherPct\": 1 } }, \"regions\": {"));
+
+        var item = Assert.Single(_store.Load());
+
+        Assert.Empty(item.Glass.Regions.Regions);
+        Assert.True(item.Glass.Settings.Enabled);
+    }
+
+    [Fact]
+    public void Load_NaNRainDensity_IsTreatedAsCorrupt()
+    {
+        WriteLibrary(M4Item.Replace(
+            "\"regions\": {",
+            "\"rain\": { \"settings\": { \"enabled\": true, \"densityPct\": \"NaN\", \"speedPct\": 50, \"windPct\": 20, \"lengthPct\": 50, \"brightnessPct\": 50 }, \"regions\": { \"regions\": [], \"invert\": false, \"featherPct\": 1 } }, \"regions\": {"));
+
+        Assert.Empty(_store.Load());
+    }
 }
