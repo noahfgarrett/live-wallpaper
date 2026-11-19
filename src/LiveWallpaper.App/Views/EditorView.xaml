@@ -1,0 +1,73 @@
+<UserControl
+    x:Class="LiveWallpaper.App.Views.EditorView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:preview="clr-namespace:LiveWallpaper.App.Preview"
+    xmlns:views="clr-namespace:LiveWallpaper.App.Views">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="320" />
+        </Grid.ColumnDefinitions>
+
+        <Grid Grid.Column="0" Margin="0,4,20,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <StackPanel Grid.Row="0" Margin="0,0,0,16" Orientation="Horizontal">
+                <ui:Button Click="OnBack" Icon="{ui:SymbolIcon ArrowLeft24}" ToolTip="Back to library" Margin="0,0,12,0" />
+                <ui:TextBlock x:Name="Heading" VerticalAlignment="Center" FontTypography="Title" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+            <Grid x:Name="PreviewArea" Grid.Row="1" SizeChanged="OnPreviewAreaSizeChanged">
+                <Border x:Name="PreviewFrame" HorizontalAlignment="Center" VerticalAlignment="Top" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                    <preview:PreviewHost x:Name="Preview" />
+                </Border>
+            </Grid>
+        </Grid>
+
+        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="0,4,4,16">
+                <DockPanel Margin="0,0,0,4">
+                    <ui:ToggleSwitch x:Name="SnowEnabled" DockPanel.Dock="Right" Checked="OnSnowChanged" Unchecked="OnSnowChanged" />
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="WeatherSnow24" Margin="0,0,8,0" />
+                        <ui:TextBlock VerticalAlignment="Center" FontTypography="Subtitle" Text="Snow" />
+                    </StackPanel>
+                </DockPanel>
+                <TextBlock Style="{StaticResource HelpText}" Text="Changes show in the preview right away, and on your desktop too if this image is applied." />
+
+                <DockPanel Margin="0,20,0,4"><TextBlock x:Name="DensityValue" DockPanel.Dock="Right" Style="{StaticResource HelpText}" /><TextBlock Text="Density" /></DockPanel>
+                <Slider x:Name="Density" Maximum="100" Minimum="0" ValueChanged="OnSliderChanged" />
+                <DockPanel Margin="0,16,0,4"><TextBlock x:Name="SpeedValue" DockPanel.Dock="Right" Style="{StaticResource HelpText}" /><TextBlock Text="Speed" /></DockPanel>
+                <Slider x:Name="Speed" Maximum="100" Minimum="0" ValueChanged="OnSliderChanged" />
+                <DockPanel Margin="0,16,0,4"><TextBlock x:Name="WindValue" DockPanel.Dock="Right" Style="{StaticResource HelpText}" /><TextBlock Text="Wind" /></DockPanel>
+                <Slider x:Name="Wind" Maximum="100" Minimum="0" ValueChanged="OnSliderChanged" />
+                <DockPanel Margin="0,16,0,4"><TextBlock x:Name="SizeValue" DockPanel.Dock="Right" Style="{StaticResource HelpText}" /><TextBlock Text="Flake size" /></DockPanel>
+                <Slider x:Name="FlakeSize" Maximum="100" Minimum="0" ValueChanged="OnSliderChanged" />
+
+                <DockPanel Margin="0,20,0,0">
+                    <ui:ToggleSwitch x:Name="MotionBlur" DockPanel.Dock="Right" Checked="OnSnowChanged" Unchecked="OnSnowChanged" />
+                    <TextBlock VerticalAlignment="Center" Text="Motion blur" />
+                </DockPanel>
+
+                <TextBlock Style="{StaticResource SectionLabel}" Text="Scaling" />
+                <ComboBox x:Name="ScalingChoice" SelectionChanged="OnScalingChanged">
+                    <ComboBoxItem Content="Fill" Tag="Fill" />
+                    <ComboBoxItem Content="Fit" Tag="Fit" />
+                    <ComboBoxItem Content="Stretch" Tag="Stretch" />
+                    <ComboBoxItem Content="Center" Tag="Center" />
+                </ComboBox>
+                <TextBlock Margin="0,6,0,0" Style="{StaticResource HelpText}" Text="Used for the preview, and as the starting choice when you apply." />
+
+                <ui:Button Margin="0,24,0,0" HorizontalAlignment="Stretch" Appearance="Primary" Click="OnApply" Content="Apply to desktop" Icon="{ui:SymbolIcon Desktop24}" />
+                <TextBlock x:Name="StatusText" Margin="0,10,0,0" Style="{StaticResource HelpText}" />
+            </StackPanel>
+        </ScrollViewer>
+
+        <Grid x:Name="Overlay" Grid.ColumnSpan="2" Background="{StaticResource OverlayBrush}" Visibility="Collapsed">
+            <views:ApplyPanel x:Name="ApplyPanel" Visibility="Collapsed" />
+        </Grid>
+    </Grid>
+</UserControl>
