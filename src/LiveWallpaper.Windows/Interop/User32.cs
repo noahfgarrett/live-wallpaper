@@ -173,6 +173,19 @@ internal static unsafe partial class User32
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool EnumChildWindows(nint parent, delegate* unmanaged<nint, nint, int> callback, nint data);
 
+    public const uint QS_ALLINPUT = 0x04FF;
+    public const uint MWMO_INPUTAVAILABLE = 0x0004;
+    public const uint PM_REMOVE = 0x0001;
+    public const uint WM_QUIT = 0x0012;
+    public const uint INFINITE = 0xFFFFFFFF;
+
+    [LibraryImport("user32.dll")]
+    public static partial uint MsgWaitForMultipleObjectsEx(uint count, nint* handles, uint milliseconds, uint wakeMask, uint flags);
+
+    [LibraryImport("user32.dll", EntryPoint = "PeekMessageW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool PeekMessage(out MSG msg, nint hWnd, uint filterMin, uint filterMax, uint remove);
+
     public static string GetClassName(nint hWnd)
     {
         var buffer = stackalloc char[256];
