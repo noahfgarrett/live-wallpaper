@@ -37,7 +37,7 @@ public sealed class PreviewHost : HwndHost
 
     private PreviewChildWindow? _window;
     private PreviewRenderer? _renderer;
-    private (string Path, WallpaperScaling Scaling)? _image;
+    private (string Path, WallpaperScaling Scaling, System.Drawing.Size Reference)? _image;
     private SnowSettings _snow = new();
     private RegionSet _regions = RegionSet.Empty;
     private (IReadOnlyList<OverlayShape> Shapes, float Scale) _overlay = ([], 1f);
@@ -52,10 +52,13 @@ public sealed class PreviewHost : HwndHost
     /// <summary>The child window's size in device pixels, which is also the render size.</summary>
     public System.Drawing.Size PixelSize { get; private set; }
 
-    public void SetImage(string path, WallpaperScaling scaling)
+    /// <param name="path">The image file.</param>
+    /// <param name="scaling">How it is scaled.</param>
+    /// <param name="reference">The monitor the preview stands for, in pixels.</param>
+    public void SetImage(string path, WallpaperScaling scaling, System.Drawing.Size reference)
     {
-        _image = (path, scaling);
-        _renderer?.SetImage(path, scaling);
+        _image = (path, scaling, reference);
+        _renderer?.SetImage(path, scaling, reference);
     }
 
     public void SetSnow(SnowSettings settings)
@@ -92,7 +95,7 @@ public sealed class PreviewHost : HwndHost
         _renderer.SetFrameRate(_frameRate);
         if (_image is { } image)
         {
-            _renderer.SetImage(image.Path, image.Scaling);
+            _renderer.SetImage(image.Path, image.Scaling, image.Reference);
         }
         return new HandleRef(this, _window.Handle);
     }

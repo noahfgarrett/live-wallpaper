@@ -23,7 +23,7 @@ public sealed class PreviewRenderer : IDisposable
     private volatile bool _stop;
     private Size _size;
     private long _sizeChangedAt;
-    private (string Path, WallpaperScaling Scaling)? _image;
+    private (string Path, WallpaperScaling Scaling, Size Reference)? _image;
     private int _imageVersion;
     private SnowSettings _snow = new();
     private RegionSet _regions = RegionSet.Empty;
@@ -50,11 +50,14 @@ public sealed class PreviewRenderer : IDisposable
         }
     }
 
-    public void SetImage(string path, WallpaperScaling scaling)
+    /// <param name="path">The image file.</param>
+    /// <param name="scaling">How it is scaled.</param>
+    /// <param name="reference">The monitor the preview stands for. Center scaling crops at its size, so the preview shows what the desktop will.</param>
+    public void SetImage(string path, WallpaperScaling scaling, Size reference)
     {
         lock (_gate)
         {
-            _image = (path, scaling);
+            _image = (path, scaling, reference);
             _imageVersion++;
         }
     }
@@ -94,7 +97,7 @@ public sealed class PreviewRenderer : IDisposable
                 {
                     Size size;
                     long changedAt;
-                    (string Path, WallpaperScaling Scaling)? image;
+                    (string Path, WallpaperScaling Scaling, Size Reference)? image;
                     int version;
                     lock (_gate)
                     {
@@ -126,7 +129,7 @@ public sealed class PreviewRenderer : IDisposable
                         snow = null;
                         try
                         {
-                            (scene, snow) = BuildScene(gpu, background, wanted.Path, wanted.Scaling, size);
+                            (scene, snow) = BuildScene(gpu, background, wanted.Path, wanted.Scaling, wanted.Reference, size);
                         }
                         catch (Exception ex) when (ex is not OutOfMemoryException)
                         {
@@ -170,14 +173,19 @@ public sealed class PreviewRenderer : IDisposable
         }
     }
 
-    private static (WallpaperScene Scene, SnowEffect Snow) BuildScene(GpuDevice gpu, ImageQuadRenderer background, string path, WallpaperScaling scaling, Size target)
+    /// <summary>Builds the scene as the reference monitor would show it, scaled down to the preview.</summary>
+    private static (WallpaperScene Scene, SnowEffect Snow) BuildScene(GpuDevice gpu, ImageQuadRenderer background, string path, WallpaperScaling scaling, Size reference, Size target)
     {
         var imageSize = WicImageLoader.ReadSize(path);
-        var crop = ScalingMath.ComputeSourceCrop(imageSize, target, scaling);
-        var decoded = WicImageLoader.Load(path, crop, ScalingMath.ComputeDecodeSize(imageSize, target, scaling));
+        var crop = ScalingMath.ComputeSourceCrop(imageSize, reference, scaling);
+        var onReference = ScalingMath.ComputeDecodeSize(imageSize, reference, scaling);
+        var decodeSize = new Size(
+            Math.Clamp((int)Math.Ceiling(onReference.Width * (double)target.Width / reference.Width), 1, crop.Width),
+            Math.Clamp((int)Math.Ceiling(onReference.Height * (double)target.Height / reference.Height), 1, crop.Height));
+        var decoded = WicImageLoader.Load(path, crop, decodeSize);
         var scene = new WallpaperScene(gpu, background, gpu.CreateImageTexture(decoded),
-            ScalingMath.ComputeDestination(crop.Size, target, scaling),
-            ScalingMath.ComputeDestination(imageSize, target, scaling));
+            ScalingMath.ComputeScaledDestination(crop.Size, reference, target, scaling),
+            ScalingMath.ComputeScaledDestination(imageSize, reference, target, scaling));
         var snow = new SnowEffect(gpu, 20261119);
         scene.Effects.Add(snow);
         return (scene, snow);

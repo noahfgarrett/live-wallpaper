@@ -83,4 +83,27 @@ public sealed class ScalingMathTests
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             ScalingMath.ComputeDecodeSize(new Size(0, 0), Hd, WallpaperScaling.Fill));
     }
+
+    [Fact]
+    public void ComputeScaledDestination_Center_ShowsWhatTheMonitorShows()
+    {
+        var bounds = ScalingMath.ComputeScaledDestination(new Size(4000, 2000), Hd, new Size(960, 540), WallpaperScaling.Center);
+
+        Assert.Equal(new RectangleF(-520, -230, 2000, 1000), bounds);
+    }
+
+    [Theory]
+    [InlineData(WallpaperScaling.Fill)]
+    [InlineData(WallpaperScaling.Fit)]
+    [InlineData(WallpaperScaling.Stretch)]
+    public void ComputeScaledDestination_ScaleInvariantModes_MatchTheTarget(WallpaperScaling scaling)
+    {
+        var scaled = ScalingMath.ComputeScaledDestination(new Size(4000, 3000), Hd, new Size(960, 540), scaling);
+        var direct = ScalingMath.ComputeDestination(new Size(4000, 3000), new Size(960, 540), scaling);
+
+        Assert.Equal(direct.X, scaled.X, 3);
+        Assert.Equal(direct.Y, scaled.Y, 3);
+        Assert.Equal(direct.Width, scaled.Width, 3);
+        Assert.Equal(direct.Height, scaled.Height, 3);
+    }
 }

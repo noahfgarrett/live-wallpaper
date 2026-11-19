@@ -38,6 +38,7 @@ In the editor's **Regions** panel:
 - **Add region** drops a 4-corner quad over the middle of the visible picture (35–65 % of it). Drag a corner to move just that corner, like a projector keystone. Drag inside a region to move it.
 - Hovering an edge of the selected region shows a dot; click there to add a corner and drag it. Right-click a corner, or click it and press Delete, to remove it (minimum 3).
 - **Snow everywhere except the regions**, **Soft edge** and **Show outlines** do what they say. **Undo**/**Redo** (Ctrl+Z, Ctrl+Y or Ctrl+Shift+Z) go back up to 99 steps, one per completed drag.
+- The preview shows the photo as your primary display will, scaled down. Under Center scaling it crops at the display's size, not the preview's, so the part you can edit is the part the desktop shows.
 - Changes show in the preview right away, are saved half a second after you stop, and go to the desktop live when the image is applied.
 
 These preview bugs are fixed in the app (tests in `RegionEditorTests`):

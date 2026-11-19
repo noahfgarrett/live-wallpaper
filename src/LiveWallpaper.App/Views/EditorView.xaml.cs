@@ -29,6 +29,7 @@ public partial class EditorView : UserControl
     private readonly DispatcherTimer _featherCommit = new() { Interval = FeatherCommitDelay };
     private readonly RegionEditor _regions;
     private readonly double _aspect;
+    private readonly System.Drawing.Size _monitorSize;
     private LibraryItem _item;
     private bool _loading = true;
     private bool _syncingRegions;
@@ -41,7 +42,10 @@ public partial class EditorView : UserControl
         _library = library;
         _item = item;
         var primary = MonitorEnumerator.Enumerate().FirstOrDefault(m => m.IsPrimary);
-        _aspect = primary is null || primary.Bounds.Height == 0 ? 16.0 / 9 : primary.Bounds.Width / (double)primary.Bounds.Height;
+        _monitorSize = primary is null || primary.Bounds.Width <= 0 || primary.Bounds.Height <= 0
+            ? new System.Drawing.Size(1920, 1080)
+            : primary.Bounds.Size;
+        _aspect = _monitorSize.Width / (double)_monitorSize.Height;
         _liveUpdates = new UpdateCoalescer<SnowSettings>(SendLiveAsync, LiveUpdateInterval);
         _liveRegions = new UpdateCoalescer<RegionSet>(SendRegionsAsync, LiveUpdateInterval);
         _saveTimer.Tick += (_, _) => Save();
@@ -72,7 +76,7 @@ public partial class EditorView : UserControl
         Preview.SetFrameRate(window.LastStatus?.Settings.FrameRate ?? FrameRateMode.Fps60);
         Preview.SetSnow(item.Snow);
         Preview.SetRegions(item.Regions);
-        Preview.SetImage(library.ImagePath(item), scaling);
+        Preview.SetImage(library.ImagePath(item), scaling, _monitorSize);
         _loading = false;
         UpdateLabels();
         UpdateRegionView();
@@ -124,7 +128,7 @@ public partial class EditorView : UserControl
     {
         if (!_loading)
         {
-            Preview.SetImage(_library.ImagePath(_item), SelectedScaling());
+            Preview.SetImage(_library.ImagePath(_item), SelectedScaling(), _monitorSize);
             UpdateRegionView();
         }
     }
@@ -145,7 +149,7 @@ public partial class EditorView : UserControl
             _regions.SetView(null);
             return;
         }
-        var imageBounds = ScalingMath.ComputeDestination(new System.Drawing.Size(_item.PixelWidth, _item.PixelHeight), pixels, SelectedScaling());
+        var imageBounds = ScalingMath.ComputeScaledDestination(new System.Drawing.Size(_item.PixelWidth, _item.PixelHeight), _monitorSize, pixels, SelectedScaling());
         _regions.SetView(new RegionView(imageBounds, pixels, DpiScale));
     }
 
