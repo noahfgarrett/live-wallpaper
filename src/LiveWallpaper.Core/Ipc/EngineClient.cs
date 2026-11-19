@@ -9,7 +9,7 @@ public sealed class EngineClient(string pipeName)
 
     public async Task<EngineResponse?> SendAsync(EngineRequest request, TimeSpan timeout, CancellationToken ct)
     {
-        await using var client = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+        await using var client = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
         try
         {
             await client.ConnectAsync(timeout, ct).ConfigureAwait(false);
@@ -18,7 +18,7 @@ public sealed class EngineClient(string pipeName)
             await PipeFraming.WriteAsync(client, request, IpcJsonContext.Default.EngineRequest, responseTimeout.Token).ConfigureAwait(false);
             return await PipeFraming.ReadAsync(client, IpcJsonContext.Default.EngineResponse, responseTimeout.Token).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is TimeoutException or IOException or JsonException or InvalidDataException || (ex is OperationCanceledException && !ct.IsCancellationRequested))
+        catch (Exception ex) when (ex is TimeoutException or IOException or JsonException or InvalidDataException or UnauthorizedAccessException || (ex is OperationCanceledException && !ct.IsCancellationRequested))
         {
             return null;
         }

@@ -142,6 +142,66 @@ public sealed class IpcTests
     public void PipeName_IsStableAndSafe()
     {
         Assert.Equal(EnginePipe.Name, EnginePipe.Name);
-        Assert.Matches("^LiveWallpaper\\.Engine\\.[A-Za-z0-9_-]+$", EnginePipe.Name);
+        Assert.Matches("^LiveWallpaper\\.Engine\\.[A-Za-z0-9_-]+\\.[0-9]+$", EnginePipe.Name);
+    }
+
+    [Fact]
+    public async Task Server_DisposeCompletes_WhenHandlerNeverFinishes()
+    {
+        var name = UniquePipe();
+        var handlerStarted = new TaskCompletionSource();
+        var server = new EnginePipeServer(name, EnginePipeServer.DefaultPipeFactory(name), _ =>
+        {
+            handlerStarted.TrySetResult();
+            return new TaskCompletionSource<EngineResponse>().Task;
+        });
+        server.Start();
+        var pending = new EngineClient(name).SendAsync(new GetStatus(), TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+        await handlerStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        var watch = Stopwatch.StartNew();
+        await server.DisposeAsync();
+
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(3), $"dispose took {watch.Elapsed}");
+        await pending;
+    }
+
+    [Fact]
+    public async Task Server_RecoversWhenCreatingThePipeThrows()
+    {
+        var name = UniquePipe();
+        var attempts = 0;
+        var real = EnginePipeServer.DefaultPipeFactory(name);
+        await using var server = new EnginePipeServer(name, () =>
+        {
+            if (Interlocked.Increment(ref attempts) == 1)
+            {
+                throw new PlatformNotSupportedException("simulated");
+            }
+            return real();
+        }, _ => Task.FromResult<EngineResponse>(new Ok()));
+        server.Start();
+
+        var response = await new EngineClient(name).SendAsync(new Reload(), TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        Assert.Equal(new Ok(), response);
+    }
+
+    [Fact]
+    public async Task Server_AnswersWhileAnotherRequestIsSlow()
+    {
+        var name = UniquePipe();
+        var release = new TaskCompletionSource<EngineResponse>();
+        await using var server = new EnginePipeServer(name, EnginePipeServer.DefaultPipeFactory(name),
+            r => r is Reload ? release.Task : Task.FromResult<EngineResponse>(new Failed("fast")));
+        server.Start();
+        var client = new EngineClient(name);
+        var slow = client.SendAsync(new Reload(), TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+
+        var fast = await client.SendAsync(new GetStatus(), TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+        release.SetResult(new Ok());
+
+        Assert.Equal(new Failed("fast"), fast);
+        Assert.Equal(new Ok(), await slow);
     }
 }
