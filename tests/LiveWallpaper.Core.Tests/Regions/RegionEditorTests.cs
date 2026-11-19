@@ -288,4 +288,16 @@ public sealed class RegionEditorTests
 
         Assert.True(raised > 0);
     }
+
+    [Fact]
+    public void SetView_RaisesChanged()
+    {
+        var editor = new RegionEditor(new RegionSet([RegionGeometry.CreateQuad()]));
+        var raised = 0;
+        editor.Changed += (_, _) => raised++;
+
+        editor.SetView(FullView);
+
+        Assert.Equal(1, raised);
+    }
 }

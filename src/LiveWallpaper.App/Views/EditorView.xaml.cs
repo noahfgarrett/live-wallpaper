@@ -133,7 +133,6 @@ public partial class EditorView : UserControl
     {
         base.OnDpiChanged(oldDpi, newDpi);
         UpdateRegionView();
-        Preview.SetOverlay(_regions.Overlay(), (float)newDpi.DpiScaleX);
     }
 
     private double DpiScale => VisualTreeHelper.GetDpi(this).DpiScaleX;

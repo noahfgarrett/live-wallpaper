@@ -60,10 +60,12 @@ public sealed class RegionEditor
 
     private NormalizedRect Visible => _view?.VisibleBounds ?? NormalizedRect.Unit;
 
+    /// <summary>Sets how the image is shown. Raises <see cref="Changed"/> so the overlay is drawn for the new view.</summary>
     public void SetView(RegionView? view)
     {
         _view = view;
         _ghost = null;
+        Raise();
     }
 
     /// <summary>Turns editing on or off (off while the outlines are hidden). Turning it off cancels a drag and drops the selection.</summary>
