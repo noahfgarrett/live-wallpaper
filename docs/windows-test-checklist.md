@@ -194,7 +194,7 @@ Use the v0.4.0-m5 zip. Three photos help: a street or landscape for rain, a wind
    - Expected: at 0% the glass between drops is clear. Higher values blur and lighten the scene behind it more and more, until at 100% it's heavily misted. The drops still show the scene behind them.
    - Result:
 8. **Sliding drops.** Set **Sliding** to 100% and watch for a minute, then set it to 0%.
-   - Expected: larger drops sit still for a while, then slide down in stop-start runs with a slight sideways wobble. They don't all move at once. Each leaves a trail of tiny beads and a clear streak through the fog that fades over a few seconds. At 0% no drop slides, and the small beads still come and go.
+   - Expected: larger drops sit still for a while, then slide down in stop-start runs with a slight sideways wobble. They don't all move at once. Each leaves a trail of tiny beads and a clear streak through the fog that fades the further it is behind the drop. After a drop slides off the bottom, its trail and beads fade away rather than vanish at once, and the next sliding drop fades in where it sits. No drop, trail or bead pops in or out. At 0% no drop slides, and the small beads still come and go.
    - Result:
 9. **Panes keep 4 corners.** Select a pane, hover its edges, click an edge, right-click a corner, then click a corner and press Delete. Drag a corner and drag inside the pane.
    - Expected: no dot appears on the edges, and no corner is ever added or removed. Dragging a corner moves only that corner (keystone), and dragging inside moves the whole pane.
@@ -233,7 +233,7 @@ Use the v0.4.0-m5 zip. Three photos help: a street or landscape for rain, a wind
     - Expected: every tab's settings, regions and arrows are as you left them, both in the editor and on the desktop.
     - Result:
 21. **Resources.** With snow only on all three displays for 5 minutes, write down the GPU and CPU of `LiveWallpaper.Engine` from Task Manager's **Processes** tab (add the GPU column if it's hidden) and the frame rate from the Performance page. Then turn all four effects on and repeat. Do this on the laptop's own screen and on the external 4K or 1440p monitor.
-    - Expected: record all the numbers for both cases. The frame rate stays near 60 fps with all four on. (The Performance page's Snowflakes count includes rain streaks.)
+    - Expected: record all the numbers for both cases. The frame rate stays near 60 fps with all four on. (The Performance page's Particles count is snowflakes plus rain streaks.)
     - Result:
 22. **Overnight.** Leave all four effects running on the desktop overnight.
     - Expected: in the morning the snow, rain, glass drops and water all still move as smoothly as when you started, with no jumps, jitter or stalls.

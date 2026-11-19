@@ -80,10 +80,10 @@ LibraryItem
 - `Region` gains an optional `Flow` (a `RegionPoint?`). It is the arrow's vector in normalized image coordinates, from the region's centroid to the arrowhead. It is null for snow, rain and glass regions. Keeping it on the region means the existing undo history, moves and deletes carry the arrow with the region for free.
 - **The library file stays schema version 1** (builder's call). The changes are additive, and System.Text.Json skips unknown properties, so v0.3 can still open a library that v0.4 saved; it just ignores the new effects. Bumping the version would make v0.3 treat the file as corrupt and back it up.
 - **Validation and repair** (builder's call, after the design review):
-  - **On library load, repair what the editor can't produce but an old or hand-edited file might.** For Glass and Water, `Invert` is forced false. A Glass region without exactly 4 points is dropped. A Water region without a valid Flow gets the default arrow.
-  - **Anything that is unsafe** (non-finite numbers, points outside the image, limits exceeded, settings out of range) **still rejects the file**, as today.
+  - **On library load, repair what the editor can't produce but an old or hand-edited file might.** For Glass and Water, `Invert` is forced false. A Glass region without exactly 4 points is dropped. A Water region without a Flow, or with a zero one, gets the default arrow, and a finite Flow outside the valid length is scaled to fit along its direction (controller ruling, final review).
+  - **Anything that is unsafe** (non-finite numbers, including a non-finite Flow, points outside the image, limits exceeded, settings out of range) **still rejects the file**, as today.
   - **The engine never repairs.** It rejects an invalid IPC message with `Failed`.
-  - The rules: each settings record has `IsValid`, like `SnowSettings`, with percentages finite and within 0–100. A Glass region has exactly 4 points. A Water Flow has finite components and a length of 0.002–1 in normalized coordinates. That is a loose bound with no aspect correction, so it needs no image size; the editor clamps the aspect-corrected length more tightly (below). Flow on a snow, rain or glass region is ignored.
+  - The rules: each settings record has `IsValid`, like `SnowSettings`, with percentages finite and within 0–100. A Glass region has exactly 4 points. A Water Flow has finite components and a length of 0.002–1 in normalized coordinates. That is a loose bound with no aspect correction, so it needs no image size; the editor clamps the aspect-corrected length more tightly (below), then keeps the normalized length within this bound too. Flow on a snow, rain or glass region is ignored.
 
 Settings (percentages unless noted). The defaults are starting points, to be tuned in the spike:
 
@@ -138,7 +138,7 @@ Changes:
   - Cost: one full-frame copy plus the mip generation per frame, only while Glass is on.
   - The layered-window (non-flip) surface path supports copies from its back buffer too; this is covered by the WARP test, which uses an offscreen target.
 - **A flow texture for Water.**
-  - Core rasterizes the water regions into an RG16F flow field at mask resolution.
+  - Core rasterizes the water regions into a flow field at mask resolution, stored as an R32G32_Float texture.
   - Each pixel holds the flow vector of the region covering it, already converted to target pixels per cycle; the last region wins where regions overlap.
   - It is rebuilt alongside the water mask. The mask provides the soft edge; the flow field is unblurred.
   - `RegionMask`'s polygon fill is reused, with no new rasterizer.
@@ -171,7 +171,7 @@ Rain uses the snow machinery, with the same stateless instancing, the same perio
   - Every timing is quantized to whole cycles per period (section 5.7).
 - **Refraction.** Each drop is a small lens. The shader computes a normal from the drop's distance field and samples the frame copy at an offset that is flipped and magnified (as real drops show an inverted view of the scene behind). It also adds a thin bright rim and a soft dark edge.
 - **Fog.** Between drops, the shader blends toward a blurred mip of the frame copy and a slight brightening, by `FogPct`. Trails and drops cut clear paths through it.
-- **Settings:** DropsPct sets the bead and drop density; DropSizePct sets the radius range; SlidingPct sets the share of drops that slide and how often; FogPct sets the fog amount.
+- **Settings:** DropsPct sets the bead and drop density; DropSizePct sets the radius range; SlidingPct sets the share of runs in which a column's drop slides (each column's run timing is fixed, so it doesn't change how often runs come); FogPct sets the fog amount.
 - **The mask:** the pane's soft edge (Feather) multiplies the whole Glass contribution, so the effect fades into the window frame.
 
 ### 5.6 Water

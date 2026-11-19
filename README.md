@@ -29,7 +29,7 @@ Nothing yet. Each behaviour is listed here only after it has been checked on a r
 - **Apply:** pick all displays or one, and a scaling mode (Fill, Fit, Stretch, Center).
 - **Tray icon:** right-click it to open the app, pause or resume the animation, switch to a recent wallpaper, open settings, or exit.
 - **Settings:** start with Windows (off by default), keep the wallpaper running when the app is closed, frame rate (30, 60 or Adaptive) and default scaling.
-- **Performance:** live frame rate, memory, CPU and snowflake count (rain streaks included) from the wallpaper engine.
+- **Performance:** live frame rate, memory, CPU and particle count (snowflakes plus rain streaks) from the wallpaper engine.
 
 The wallpaper itself is drawn by a small background program, `LiveWallpaper.Engine.exe`, which keeps running in the tray after you close the app. Settings and the library live in `%LOCALAPPDATA%\LiveWallpaper\`, and logs in `%LOCALAPPDATA%\LiveWallpaper\logs\`.
 

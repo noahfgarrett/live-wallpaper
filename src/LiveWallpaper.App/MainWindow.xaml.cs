@@ -23,6 +23,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     private EditorView? _editor;
     private int _missedStatus;
     private bool _refreshing;
+    private bool _isEngineOutdated;
     private EngineStart _lastStart = EngineStart.Running;
 
     public MainWindow(EngineConnection engine, AppPage startPage)
@@ -67,13 +68,15 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         _refreshing = true;
         try
         {
-            var status = await _engine.GetStatusAsync(CancellationToken.None);
-            _missedStatus = status is null ? _missedStatus + 1 : 0;
-            if (status is null && _missedStatus < 2 && LastStatus is not null)
+            var answer = await _engine.GetStatusAsync(CancellationToken.None);
+            _missedStatus = answer is null ? _missedStatus + 1 : 0;
+            if (answer is null && _missedStatus < 2 && LastStatus is not null)
             {
                 return;
             }
-            LastStatus = status;
+            // An outdated engine counts as not running, so nothing is sent to it and the status line isn't green.
+            _isEngineOutdated = answer is not null && EngineProtocol.NeedsReplacement(answer);
+            LastStatus = _isEngineOutdated ? null : answer;
         }
         finally
         {
@@ -82,8 +85,8 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         if (LastStatus is null)
         {
             EngineDot.Fill = StoppedBrush;
-            EngineText.Text = _lastStart == EngineStart.OlderEngineInTheWay
-                ? EngineConnection.Describe(_lastStart)
+            EngineText.Text = _lastStart == EngineStart.OlderEngineInTheWay || _isEngineOutdated
+                ? EngineConnection.Describe(EngineStart.OlderEngineInTheWay)
                 : "The wallpaper engine isn't running";
         }
         else
