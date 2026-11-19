@@ -91,7 +91,7 @@ Settings (percentages unless noted). The defaults are starting points, to be tun
 | Record | Fields (default) |
 |---|---|
 | `RainSettings` | Enabled (false), DensityPct (50), SpeedPct (50), WindPct (20), LengthPct (50), BrightnessPct (50) |
-| `GlassSettings` | Enabled (false), DropsPct (50), DropSizePct (50), SlidingPct (40), FogPct (20) |
+| `GlassSettings` | Enabled (false), DropsPct (50), DropSizePct (50), SlidingPct (40), FogPct (30) |
 | `WaterSettings` | Enabled (false), StretchPct (50), FoamPct (30) |
 
 Snow's `Enabled` default stays true, so imports keep today's behaviour.
@@ -152,7 +152,7 @@ Rain uses the snow machinery, with the same stateless instancing, the same perio
 
 - **Three layers (far, mid, near):** these vary width (about 1–3 px at 1080p), length, fall speed (several times snow's), opacity and wind response. Near streaks are longer, softer and fewer.
 - **Each streak is a thin quad aligned with its velocity** (fall plus wind). Its length is `velocity × exposure`, with the exposure set by `LengthPct`, so wind visibly slants the rain and gusts sweep it.
-- **Look:** alpha fades in along the streak (tapered head and tail) with a soft cross-section. Each streak takes a little of the blurred photo's colour behind it (sampled from the image texture at a high mip, or a low-resolution copy). Rain reads as lit by the scene rather than as pure white. `BrightnessPct` scales the opacity.
+- **Look:** alpha fades in along the streak (tapered head and tail) with a soft cross-section, in a cool white. Tuning showed that taking colour from the photo isn't needed: low premultiplied alpha already makes rain faint on a bright sky and visible against dark backgrounds, as in real rain photos. `BrightnessPct` scales the opacity.
 - **Settings mapping (functions in `RainModel`, unit-tested):**
   - density sets the streaks per megapixel, capped;
   - speed sets the fall multiplier;
@@ -183,6 +183,7 @@ Rain uses the snow machinery, with the same stateless instancing, the same perio
   - `flow` comes from the flow texture: the arrow's speed vector in target pixels per second, multiplied by C in the shader.
   - A low-frequency hash noise, sampled once per pixel, offsets the phase spatially, so the reset blend never pulses in step across the region.
   - The displacement is clamped so the samples stay inside the decoded image's bounds (sampler clamp).
+  - Each sample is weighted by the water mask at the sample point, not at the pixel, so rock above a waterfall isn't dragged into the water. That was the most visible artifact in tuning. The undisplaced pixel is a small fallback.
 - **Speed comes only from the arrow.** **Stretch** (the slider; named `StretchPct` in `WaterSettings`, replacing the earlier "Strength" from conversation) sets the cycle length C, from about 0.5 s to 3 s.
   - The distance per cycle is speed × C, so a low setting gives a tight shimmer and a high one gives long streaming streaks, while the water flows at the same speed either way.
   - The phase is integrated on the CPU like `FallClock` (`phase = frac(phase + dt / C)`, in double precision). A slider change alters the rate, never the position.
