@@ -248,8 +248,10 @@ float4 PSMain(VSOut input) : SV_Target
         }
         float ph = frac(t);
         float start = lerp(0.25, 0.55, Rnd(run, 4u));
-        // The slide ends at 0.88 of the cycle and the trail fades out after it, so nothing pops when the next run starts.
+        // The drop and its trail fade in together, the slide ends at 0.88 of the cycle and both fade out after it,
+        // so nothing pops when a run starts or ends.
         float u = saturate((ph - start) / (0.88 - start));
+        float startFade = smoothstep(0.0, 0.04, ph);
         float endFade = 1.0 - smoothstep(0.88, 1.0, ph);
         float hops = lerp(3.0, 7.0, Rnd(run, 5u));
         float prog = u - sin(TwoPi * hops * u) / (TwoPi * hops) * 0.9;
@@ -261,7 +263,7 @@ float4 PSMain(VSOut input) : SV_Target
         float wobPhase = Rnd(run, 11u) * 6.28;
         float r = lerp(7.0, 13.0, Rnd(run, 10u)) * sizeMul;
         float2 c = float2(baseX + sin(y * wobF + wobPhase) * wobA, y);
-        Consider(best, bestAlpha, p, c, r, smoothstep(0.0, 0.04, ph), 0.72);
+        Consider(best, bestAlpha, p, c, r, startFade * endFade, 0.72);
 
         // The trail above the drop: a clear streak through the fog, dotted with tiny beads.
         float pathX = baseX + sin(p.y * wobF + wobPhase) * wobA;
@@ -269,7 +271,7 @@ float4 PSMain(VSOut input) : SV_Target
         if (behind > 0.0 && p.y > y0 - r)
         {
             float trailW = r * 0.55;
-            float fade = exp(-behind / (paneH * 0.35)) * endFade;
+            float fade = exp(-behind / (paneH * 0.35)) * startFade * endFade;
             clear = max(clear, smoothstep(trailW, trailW * 0.4, abs(p.x - pathX)) * fade);
             float seg = 7.0 * sizeMul;
             float k = floor(p.y / seg);
