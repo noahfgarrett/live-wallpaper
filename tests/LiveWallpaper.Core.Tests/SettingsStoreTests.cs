@@ -113,4 +113,30 @@ public sealed class SettingsStoreTests : IDisposable
 
         Assert.True(File.Exists(Path.Combine(_dir.Path, "a", "b", "settings.json")));
     }
+
+    [Fact]
+    public void Load_WhenMonitorEntryNull_TreatsAsCorrupt()
+    {
+        File.WriteAllText(_dir.File("settings.json"), """{ "schemaVersion": 1, "monitors": [ null ] }""");
+
+        Assert.Equal(SettingsLoadOutcome.CorruptReplaced, _store.Load().Outcome);
+    }
+
+    [Fact]
+    public void Load_WhenScalingNumeric_TreatsAsCorrupt()
+    {
+        File.WriteAllText(_dir.File("settings.json"),
+            """{ "schemaVersion": 1, "monitors": [ { "monitorId": "M", "imagePath": "a.jpg", "scaling": 7 } ] }""");
+
+        Assert.Equal(SettingsLoadOutcome.CorruptReplaced, _store.Load().Outcome);
+    }
+
+    [Fact]
+    public void Load_WhenMonitorIdEmpty_TreatsAsCorrupt()
+    {
+        File.WriteAllText(_dir.File("settings.json"),
+            """{ "schemaVersion": 1, "monitors": [ { "monitorId": " ", "imagePath": "a.jpg", "scaling": "fill" } ] }""");
+
+        Assert.Equal(SettingsLoadOutcome.CorruptReplaced, _store.Load().Outcome);
+    }
 }

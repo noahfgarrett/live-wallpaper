@@ -27,6 +27,7 @@ public sealed class SettingsStore(string filePath, TimeProvider timeProvider)
             using var stream = File.OpenRead(filePath);
             var settings = JsonSerializer.Deserialize(stream, CoreJsonContext.Default.AppSettings)
                 ?? throw new JsonException("Settings file contained null.");
+            Validate(settings);
             return new SettingsLoadResult(settings, SettingsLoadOutcome.Loaded, null);
         }
         catch (JsonException)
@@ -37,6 +38,20 @@ public sealed class SettingsStore(string filePath, TimeProvider timeProvider)
             var defaults = new AppSettings();
             Save(defaults);
             return new SettingsLoadResult(defaults, SettingsLoadOutcome.CorruptReplaced, backupPath);
+        }
+    }
+
+    private static void Validate(AppSettings settings)
+    {
+        foreach (var assignment in settings.Monitors)
+        {
+            if (assignment is null
+                || string.IsNullOrWhiteSpace(assignment.MonitorId)
+                || string.IsNullOrWhiteSpace(assignment.ImagePath)
+                || !Enum.IsDefined(assignment.Scaling))
+            {
+                throw new JsonException("Settings file contains an invalid monitor assignment.");
+            }
         }
     }
 

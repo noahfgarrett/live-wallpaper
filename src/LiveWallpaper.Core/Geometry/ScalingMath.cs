@@ -38,8 +38,8 @@ public static class ScalingMath
                 height = Math.Min(image.Height, target.Height);
                 break;
             case WallpaperScaling.Center:
-                width = image.Width;
-                height = image.Height;
+                width = Math.Min(image.Width, target.Width);
+                height = Math.Min(image.Height, target.Height);
                 break;
             case WallpaperScaling.Fill:
             case WallpaperScaling.Fit:
@@ -56,6 +56,20 @@ public static class ScalingMath
 
         var cap = Math.Min(1.0, MaxTextureDimension / Math.Max(width, height));
         return new Size(CeilToPixels(width * cap), CeilToPixels(height * cap));
+    }
+
+    public static Rectangle ComputeSourceCrop(Size image, Size target, WallpaperScaling scaling)
+    {
+        RequirePositive(image, nameof(image));
+        RequirePositive(target, nameof(target));
+
+        if (scaling != WallpaperScaling.Center)
+        {
+            return new Rectangle(Point.Empty, image);
+        }
+        var width = Math.Min(image.Width, target.Width);
+        var height = Math.Min(image.Height, target.Height);
+        return new Rectangle((image.Width - width) / 2, (image.Height - height) / 2, width, height);
     }
 
     private static double WidthRatio(Size image, Size target) => (double)target.Width / image.Width;

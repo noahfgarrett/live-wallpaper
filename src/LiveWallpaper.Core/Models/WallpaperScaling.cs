@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace LiveWallpaper.Core.Models;
 
-[JsonConverter(typeof(JsonStringEnumConverter<WallpaperScaling>))]
+[JsonConverter(typeof(WallpaperScalingJsonConverter))]
 public enum WallpaperScaling
 {
     [JsonStringEnumMemberName("fill")]
@@ -17,3 +17,5 @@ public enum WallpaperScaling
     [JsonStringEnumMemberName("center")]
     Center,
 }
+
+public sealed class WallpaperScalingJsonConverter() : JsonStringEnumConverter<WallpaperScaling>(namingPolicy: null, allowIntegerValues: false);

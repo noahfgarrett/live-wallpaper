@@ -31,10 +31,40 @@ public sealed class ScalingMathTests
     [InlineData(800, 600, WallpaperScaling.Fill, 800, 600)]
     [InlineData(4000, 3000, WallpaperScaling.Fit, 1440, 1080)]
     [InlineData(4000, 3000, WallpaperScaling.Stretch, 1920, 1080)]
-    [InlineData(20000, 10000, WallpaperScaling.Center, 16384, 8192)]
+    [InlineData(20000, 10000, WallpaperScaling.Center, 1920, 1080)]
+    [InlineData(1000, 800, WallpaperScaling.Center, 1000, 800)]
     public void ComputeDecodeSize_NeverUpscalesAndRespectsTextureCap(int iw, int ih, WallpaperScaling scaling, int ew, int eh)
     {
         Assert.Equal(new Size(ew, eh), ScalingMath.ComputeDecodeSize(new Size(iw, ih), Hd, scaling));
+    }
+
+    [Fact]
+    public void ComputeDecodeSize_CapsAtMaxTextureDimension()
+    {
+        Assert.Equal(new Size(16384, 8192),
+            ScalingMath.ComputeDecodeSize(new Size(20000, 10000), new Size(40000, 20000), WallpaperScaling.Fit));
+    }
+
+    [Fact]
+    public void ComputeSourceCrop_CenterLargerImage_ReturnsCenteredTargetSizedRegion()
+    {
+        Assert.Equal(new Rectangle(1040, 960, 1920, 1080),
+            ScalingMath.ComputeSourceCrop(new Size(4000, 3000), Hd, WallpaperScaling.Center));
+    }
+
+    [Fact]
+    public void ComputeSourceCrop_CenterSmallerImage_ReturnsWholeImage()
+    {
+        Assert.Equal(new Rectangle(0, 0, 1000, 1000), ScalingMath.ComputeSourceCrop(Square, Hd, WallpaperScaling.Center));
+    }
+
+    [Theory]
+    [InlineData(WallpaperScaling.Fill)]
+    [InlineData(WallpaperScaling.Fit)]
+    [InlineData(WallpaperScaling.Stretch)]
+    public void ComputeSourceCrop_OtherModes_ReturnWholeImage(WallpaperScaling scaling)
+    {
+        Assert.Equal(new Rectangle(0, 0, 4000, 3000), ScalingMath.ComputeSourceCrop(new Size(4000, 3000), Hd, scaling));
     }
 
     [Theory]
