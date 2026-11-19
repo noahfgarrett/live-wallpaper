@@ -27,7 +27,9 @@ The engine and the editor preview build the same mask (`RegionMask` in Core, `Re
 
 - **Overlapping regions are united.** The preview filled every region in one path with the nonzero rule, so two overlapping regions drawn in opposite directions cancelled where they overlapped.
 - **The blur extends the frame border** (clamp to edge). A region that touches the edge of the screen stays solid there; the preview faded it.
-- **Wide soft edges use a smaller mask.** When σ is over 3 px, the mask is rasterized at `max(1/8, 3/σ)` of the render size, and the GPU's linear filtering scales it up. A blur that wide hides the difference, and it keeps a 4K mask cheap enough to rebuild while you drag a corner with the image on the desktop.
+- **Soft edges use a smaller mask.** When σ is over 1 px, the mask is rasterized at `max(1/8, 1/σ)` of the render size, so σ is about one mask pixel, and the GPU's linear filtering softens it a little more as it scales the mask up. The difference doesn't show on a soft edge, and it keeps the mask cheap to rebuild while you drag a corner with the image on the desktop. A hard edge (0 %) is always rasterized at full resolution.
+
+The mask is built on the render thread. On an Apple-silicon Mac, a 4K mask takes about 2–7 ms for one or two regions at any soft edge. The worst case, 16 frame-sized regions of 64 points with a hard edge, takes about 50 ms, which shows as a brief hitch while dragging.
 
 ## Editing
 
@@ -35,7 +37,7 @@ In the editor's **Regions** panel:
 
 - **Add region** drops a 4-corner quad over the middle of the visible picture (35–65 % of it). Drag a corner to move just that corner, like a projector keystone. Drag inside a region to move it.
 - Hovering an edge of the selected region shows a dot; click there to add a corner and drag it. Right-click a corner, or click it and press Delete, to remove it (minimum 3).
-- **Snow everywhere except the regions**, **Soft edge** and **Show outlines** do what they say. **Undo**/**Redo** (Ctrl+Z, Ctrl+Y or Ctrl+Shift+Z) keep 100 steps, one per completed drag.
+- **Snow everywhere except the regions**, **Soft edge** and **Show outlines** do what they say. **Undo**/**Redo** (Ctrl+Z, Ctrl+Y or Ctrl+Shift+Z) go back up to 99 steps, one per completed drag.
 - Changes show in the preview right away, are saved half a second after you stop, and go to the desktop live when the image is applied.
 
 These preview bugs are fixed in the app (tests in `RegionEditorTests`):
@@ -51,7 +53,7 @@ The preview is a Win32 child window in an `HwndHost`, and WPF can't draw over it
 
 The app draws them in the renderer (`RegionOverlayRenderer`) and reads the mouse from the child window's messages (`PreviewHost.WndProc`), because:
 
-- **It always lines up.** The renderer draws the handles with the same image rectangle it uses for the photo and the snow, so they stay pixel-aligned at any DPI and while the window resizes.
+- **It always lines up.** The renderer draws the handles with the same image rectangle it uses for the photo and the snow, so they stay pixel-aligned at any DPI. While the window is being resized, the preview rebuilds its scene only once the size settles, so for that moment clicks can land slightly off the drawn handles.
 - **There's no second window to keep in sync.** A layered window would have to follow every move, resize, minimize, DPI change and virtual-desktop switch, hide when the Apply panel hides the preview, and it would visibly lag behind while the main window moves.
 
 The cost is a small SDF shader for lines and circles, and mouse capture through `SetCapture`.

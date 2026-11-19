@@ -149,8 +149,8 @@ Use the v0.3.0-m4 zip. Stop the older engine first (tray → **Exit**), then ope
 12. **Apply.** **Apply to desktop → All displays**.
     - Expected: on every display, snow follows the regions exactly as in the preview, on the same part of the photo even on a display with a different shape.
     - Result:
-13. **Live drag.** With the image applied, drag a corner and move **Soft edge** to 10% while watching the desktop.
-    - Expected: the desktop follows within a moment and the snow keeps falling smoothly, with no long freezes.
+13. **Live drag.** With the image applied, drag a corner and move **Soft edge** to 10% while watching the desktop. Repeat with **Soft edge** at 0% and at 0.1%, ideally on a 4K display.
+    - Expected: the desktop follows within a moment and the snow keeps falling smoothly at every soft edge, with no long freezes.
     - Result:
 14. **Saved.** Close the app, reopen it and edit the same image. Then choose tray → **Exit**, start the app again and look at the desktop.
     - Expected: the regions, invert and soft edge are all as you left them, both in the editor and on the desktop.

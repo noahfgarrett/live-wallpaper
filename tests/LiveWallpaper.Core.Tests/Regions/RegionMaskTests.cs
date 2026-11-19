@@ -87,7 +87,7 @@ public sealed class RegionMaskTests
     [Fact]
     public void Build_Feather_SoftensEdge()
     {
-        var mask = Build(Wide, 4, false, Clockwise(0.5, 0, 1, 1));
+        var mask = Build(Wide, 2, false, Clockwise(0.5, 0, 1, 1));
 
         for (var x = 1; x < mask.Width; x++)
         {
@@ -102,7 +102,7 @@ public sealed class RegionMaskTests
     [Fact]
     public void Build_FeatherAtFrameEdge_StaysSolid()
     {
-        var mask = Build(Wide, 4, false, Clockwise(0, 0, 0.5, 1));
+        var mask = Build(Wide, 2, false, Clockwise(0, 0, 0.5, 1));
 
         Assert.Equal(255, At(mask, 0, 10));
         Assert.Equal(255, At(mask, 0, 0));
@@ -111,8 +111,8 @@ public sealed class RegionMaskTests
     [Fact]
     public void Build_FeatherUsesImageWidthNotTargetWidth()
     {
-        var narrowImage = Build(Wide, new RectangleF(25, 0, 50, 20), 4, false, Clockwise(0.5, 0, 1, 1));
-        var fullImage = Build(Wide, 4, false, Clockwise(0.5, 0, 1, 1));
+        var narrowImage = Build(Wide, new RectangleF(25, 0, 50, 20), 2, false, Clockwise(0.5, 0, 1, 1));
+        var fullImage = Build(Wide, 2, false, Clockwise(0.5, 0, 1, 1));
 
         Assert.True(TransitionWidth(narrowImage, 10, 40, 60) < TransitionWidth(fullImage, 10, 40, 60));
     }
@@ -131,8 +131,8 @@ public sealed class RegionMaskTests
     public void ScaleFor_KeepsSmallBlursAtFullResolution()
     {
         Assert.Equal(1, RegionMask.ScaleFor(0));
-        Assert.Equal(1, RegionMask.ScaleFor(3));
-        Assert.Equal(0.5, RegionMask.ScaleFor(6), 9);
+        Assert.Equal(1, RegionMask.ScaleFor(1));
+        Assert.Equal(0.5, RegionMask.ScaleFor(2), 9);
         Assert.Equal(RegionMask.MinScale, RegionMask.ScaleFor(500));
     }
 
@@ -155,5 +155,42 @@ public sealed class RegionMaskTests
         Assert.Equal(255, At(mask, 499, 500));
         Assert.Equal(0, At(mask, 500, 500));
         Assert.Equal(0, At(mask, 750, 500));
+    }
+
+    [Fact]
+    public void Build_Feather_IsTheSameWhereverTheRegionSits()
+    {
+        var target = new Size(200, 100);
+        var left = Build(target, 1, false, Clockwise(0.2, 0.3, 0.4, 0.7));
+        var right = Build(target, 1, false, Clockwise(0.6, 0.3, 0.8, 0.7));
+
+        for (var y = 0; y < target.Height; y++)
+        {
+            for (var x = 0; x < 80; x++)
+            {
+                Assert.Equal(At(left, x, y), At(right, x + 80, y));
+            }
+        }
+    }
+
+    [Fact]
+    public void Build_Feather_FadesToZeroAwayFromRegion()
+    {
+        var mask = Build(new Size(200, 100), 1, false, Clockwise(0.4, 0.4, 0.6, 0.6));
+
+        Assert.Equal(0, At(mask, 0, 0));
+        Assert.Equal(0, At(mask, 199, 99));
+        Assert.Equal(0, At(mask, 100, 5));
+        Assert.Equal(255, At(mask, 100, 50));
+    }
+
+    [Fact]
+    public void Build_InvertedFeather_KeepsFrameEdgesWhite()
+    {
+        var mask = Build(new Size(200, 100), 1, true, Clockwise(0.4, 0.4, 0.6, 0.6));
+
+        Assert.Equal(255, At(mask, 0, 0));
+        Assert.Equal(255, At(mask, 199, 99));
+        Assert.Equal(0, At(mask, 100, 50));
     }
 }

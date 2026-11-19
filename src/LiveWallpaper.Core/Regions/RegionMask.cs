@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Drawing;
 
 namespace LiveWallpaper.Core.Regions;
@@ -12,8 +13,12 @@ public sealed record MaskImage(int Width, int Height, byte[] Pixels);
 /// </summary>
 public static class RegionMask
 {
-    /// <summary>Wide blurs are computed on a smaller mask so σ is about this many mask pixels.</summary>
-    public const double BlurSigmaAtMaskPx = 3;
+    /// <summary>
+    /// Blurs wider than this many pixels are computed on a smaller mask, so σ is about this many mask pixels.
+    /// The GPU's linear filtering adds a little more softness when it scales the mask up, and a full-resolution
+    /// 4K blur would be too slow to rebuild while a corner is dragged live.
+    /// </summary>
+    public const double BlurSigmaAtMaskPx = 1;
 
     /// <summary>The smallest mask, as a fraction of the render target.</summary>
     public const double MinScale = 0.125;
@@ -22,6 +27,7 @@ public static class RegionMask
     private const int SubScanlines = 4;
     private const float SubScanlineWeight = 1f / SubScanlines;
     private const int BoxPasses = 3;
+    private const int ReciprocalBits = 24;
 
     public static double ScaleFor(double sigmaPx) =>
         sigmaPx <= BlurSigmaAtMaskPx ? 1 : Math.Max(MinScale, BlurSigmaAtMaskPx / sigmaPx);
@@ -50,19 +56,21 @@ public static class RegionMask
         var sy = (double)height / target.Height;
 
         var pixels = new byte[width * height];
-        var row = new float[width];
+        var cover = new float[width + 1];
+        var delta = new float[width + 1];
         var crossings = new List<Crossing>();
+        var filled = PixelRect.Empty;
         foreach (var region in set.Regions)
         {
             var points = region.Points
                 .Select(p => new RegionPoint((imageBounds.X + (p.X * imageBounds.Width)) * sx, (imageBounds.Y + (p.Y * imageBounds.Height)) * sy))
                 .ToArray();
-            Fill(points, pixels, width, height, row, crossings);
+            filled = filled.Union(Fill(points, pixels, width, height, cover, delta, crossings));
         }
 
-        if (sigma > 0)
+        if (sigma > 0 && !filled.IsEmpty)
         {
-            Blur(pixels, width, height, sigma * scale);
+            Blur(pixels, width, height, sigma * scale, filled);
         }
         if (set.Invert)
         {
@@ -74,15 +82,21 @@ public static class RegionMask
         return new MaskImage(width, height, pixels);
     }
 
-    private static void Fill(RegionPoint[] points, byte[] pixels, int width, int height, float[] row, List<Crossing> crossings)
+    /// <summary>Fills one polygon into the mask (union by max) and returns the pixels it may have touched.</summary>
+    private static PixelRect Fill(RegionPoint[] points, byte[] pixels, int width, int height, float[] cover, float[] delta, List<Crossing> crossings)
     {
         var top = Math.Max(0, (int)Math.Floor(points.Min(p => p.Y)));
         var bottom = Math.Min(height - 1, (int)Math.Ceiling(points.Max(p => p.Y)) - 1);
         var left = Math.Clamp((int)Math.Floor(points.Min(p => p.X)), 0, width);
         var right = Math.Clamp((int)Math.Ceiling(points.Max(p => p.X)), 0, width);
+        if (top > bottom || left >= right)
+        {
+            return PixelRect.Empty;
+        }
         for (var y = top; y <= bottom; y++)
         {
-            Array.Clear(row, left, right - left);
+            Array.Clear(cover, left, right - left + 1);
+            Array.Clear(delta, left, right - left + 1);
             for (var s = 0; s < SubScanlines; s++)
             {
                 var scanY = y + ((s + 0.5) / SubScanlines);
@@ -111,17 +125,20 @@ public static class RegionMask
                     }
                     else if (before != 0 && winding == 0)
                     {
-                        AddSpan(row, start, crossing.X);
+                        AddSpan(cover, delta, width, start, crossing.X);
                     }
                 }
             }
 
             var offset = y * width;
+            var running = 0f;
             for (var x = left; x < right; x++)
             {
-                if (row[x] > 0)
+                running += delta[x];
+                var coverage = running + cover[x];
+                if (coverage > 0)
                 {
-                    var value = (byte)Math.Round(Math.Min(1f, row[x]) * 255);
+                    var value = (byte)Math.Round(Math.Min(1f, coverage) * 255);
                     if (value > pixels[offset + x])
                     {
                         pixels[offset + x] = value;
@@ -129,12 +146,17 @@ public static class RegionMask
                 }
             }
         }
+        return new PixelRect(left, top, right - 1, bottom);
     }
 
-    private static void AddSpan(float[] row, double from, double to)
+    /// <summary>
+    /// Adds one sub-scanline span: partial end pixels go straight into <paramref name="cover"/>, and the whole pixels
+    /// between them into <paramref name="delta"/>, which the caller turns into coverage with a running sum.
+    /// </summary>
+    private static void AddSpan(float[] cover, float[] delta, int width, double from, double to)
     {
-        var x0 = Math.Clamp(from, 0, row.Length);
-        var x1 = Math.Clamp(to, 0, row.Length);
+        var x0 = Math.Clamp(from, 0, width);
+        var x1 = Math.Clamp(to, 0, width);
         if (x1 <= x0)
         {
             return;
@@ -143,33 +165,48 @@ public static class RegionMask
         var i1 = (int)Math.Floor(x1);
         if (i0 == i1)
         {
-            row[i0] += (float)(x1 - x0) * SubScanlineWeight;
+            cover[i0] += (float)(x1 - x0) * SubScanlineWeight;
             return;
         }
-        row[i0] += (float)(i0 + 1 - x0) * SubScanlineWeight;
-        for (var i = i0 + 1; i < i1; i++)
-        {
-            row[i] += SubScanlineWeight;
-        }
-        if (i1 < row.Length)
-        {
-            row[i1] += (float)(x1 - i1) * SubScanlineWeight;
-        }
+        cover[i0] += (float)(i0 + 1 - x0) * SubScanlineWeight;
+        delta[i0 + 1] += SubScanlineWeight;
+        delta[i1] -= SubScanlineWeight;
+        cover[i1] += (float)(x1 - i1) * SubScanlineWeight;
     }
 
-    /// <summary>Three box blurs per axis approximate a Gaussian. The frame border is extended (clamp to edge).</summary>
-    private static void Blur(byte[] pixels, int width, int height, double sigma)
+    /// <summary>
+    /// Three box blurs per axis approximate a Gaussian. The frame border is extended (clamp to edge).
+    /// Only the filled area plus the blur's reach is processed: everything else is zero before and after.
+    /// </summary>
+    private static void Blur(byte[] pixels, int width, int height, double sigma, PixelRect filled)
     {
-        var temp = new byte[pixels.Length];
-        foreach (var size in BoxSizes(sigma))
+        var radii = BoxSizes(sigma).Select(size => (size - 1) / 2).Where(r => r > 0).ToArray();
+        if (radii.Length == 0)
         {
-            var radius = (size - 1) / 2;
-            if (radius == 0)
+            return;
+        }
+        var reach = radii.Sum() + 1;
+        var area = filled.Grow(reach).ClampTo(width, height);
+        var band = area.Grow(radii.Max()).ClampTo(width, height);
+
+        var temp = ArrayPool<byte>.Shared.Rent(pixels.Length);
+        var sums = ArrayPool<int>.Shared.Rent(width);
+        try
+        {
+            for (var y = band.Top; y <= band.Bottom; y++)
             {
-                continue;
+                Array.Clear(temp, (y * width) + band.Left, band.Width);
             }
-            BoxPass(pixels, temp, width, height, radius, horizontal: true);
-            BoxPass(temp, pixels, width, height, radius, horizontal: false);
+            foreach (var radius in radii)
+            {
+                BoxHorizontal(pixels, temp, width, area, radius);
+                BoxVertical(temp, pixels, width, height, area, radius, sums);
+            }
+        }
+        finally
+        {
+            ArrayPool<int>.Shared.Return(sums);
+            ArrayPool<byte>.Shared.Return(temp);
         }
     }
 
@@ -192,27 +229,76 @@ public static class RegionMask
         return sizes;
     }
 
-    private static void BoxPass(byte[] source, byte[] destination, int width, int height, int radius, bool horizontal)
+    /// <summary>Rounded division by the window, as a multiply and shift.</summary>
+    private static long Reciprocal(int window) => ((1L << ReciprocalBits) + (window / 2)) / window;
+
+    private static byte Average(long sum, long reciprocal) => (byte)Math.Min(255, ((sum * reciprocal) + (1L << (ReciprocalBits - 1))) >> ReciprocalBits);
+
+    private static void BoxHorizontal(byte[] source, byte[] destination, int width, PixelRect area, int radius)
     {
-        var length = horizontal ? width : height;
-        var lines = horizontal ? height : width;
-        var step = horizontal ? 1 : width;
-        var window = (2 * radius) + 1;
-        for (var line = 0; line < lines; line++)
+        var reciprocal = Reciprocal((2 * radius) + 1);
+        var last = width - 1;
+        for (var y = area.Top; y <= area.Bottom; y++)
         {
-            var origin = horizontal ? line * width : line;
+            var row = y * width;
             var sum = 0;
-            for (var k = -radius; k <= radius; k++)
+            for (var k = area.Left - radius; k <= area.Left + radius; k++)
             {
-                sum += source[origin + (Math.Clamp(k, 0, length - 1) * step)];
+                sum += source[row + Math.Clamp(k, 0, last)];
             }
-            for (var i = 0; i < length; i++)
+            for (var x = area.Left; x <= area.Right; x++)
             {
-                destination[origin + (i * step)] = (byte)((sum + (window / 2)) / window);
-                sum += source[origin + (Math.Min(i + radius + 1, length - 1) * step)];
-                sum -= source[origin + (Math.Max(i - radius, 0) * step)];
+                destination[row + x] = Average(sum, reciprocal);
+                sum += source[row + Math.Min(x + radius + 1, last)] - source[row + Math.Max(x - radius, 0)];
             }
         }
+    }
+
+    /// <summary>Walks down the rows keeping one running sum per column, so memory is read in order.</summary>
+    private static void BoxVertical(byte[] source, byte[] destination, int width, int height, PixelRect area, int radius, int[] sums)
+    {
+        var reciprocal = Reciprocal((2 * radius) + 1);
+        var last = height - 1;
+        Array.Clear(sums, area.Left, area.Width);
+        for (var k = area.Top - radius; k <= area.Top + radius; k++)
+        {
+            var row = Math.Clamp(k, 0, last) * width;
+            for (var x = area.Left; x <= area.Right; x++)
+            {
+                sums[x] += source[row + x];
+            }
+        }
+        for (var y = area.Top; y <= area.Bottom; y++)
+        {
+            var row = y * width;
+            var add = Math.Min(y + radius + 1, last) * width;
+            var remove = Math.Max(y - radius, 0) * width;
+            for (var x = area.Left; x <= area.Right; x++)
+            {
+                destination[row + x] = Average(sums[x], reciprocal);
+                sums[x] += source[add + x] - source[remove + x];
+            }
+        }
+    }
+
+    /// <summary>An inclusive pixel rectangle.</summary>
+    private readonly record struct PixelRect(int Left, int Top, int Right, int Bottom)
+    {
+        public static PixelRect Empty { get; } = new(0, 0, -1, -1);
+
+        public bool IsEmpty => Right < Left || Bottom < Top;
+
+        public int Width => Right - Left + 1;
+
+        public PixelRect Union(PixelRect other) =>
+            IsEmpty ? other
+            : other.IsEmpty ? this
+            : new(Math.Min(Left, other.Left), Math.Min(Top, other.Top), Math.Max(Right, other.Right), Math.Max(Bottom, other.Bottom));
+
+        public PixelRect Grow(int by) => new(Left - by, Top - by, Right + by, Bottom + by);
+
+        public PixelRect ClampTo(int width, int height) =>
+            new(Math.Max(0, Left), Math.Max(0, Top), Math.Min(width - 1, Right), Math.Min(height - 1, Bottom));
     }
 
     private readonly record struct Crossing(double X, int Direction);
