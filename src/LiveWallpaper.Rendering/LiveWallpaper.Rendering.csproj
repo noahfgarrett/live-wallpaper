@@ -11,6 +11,7 @@
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="..\LiveWallpaper.Media\LiveWallpaper.Media.csproj" />
+        <ProjectReference Include="..\LiveWallpaper.Core\LiveWallpaper.Core.csproj" />
     </ItemGroup>
     <ItemGroup>
         <EmbeddedResource Include="Shaders\*.hlsl" LogicalName="LiveWallpaper.Rendering.Shaders.%(Filename)%(Extension)" />

@@ -17,6 +17,7 @@ public sealed class ImageQuadRenderer : IDisposable
     private readonly ID3D11PixelShader _pixelShader;
     private readonly ID3D11Buffer _constants;
     private readonly ID3D11SamplerState _sampler;
+    private readonly ID3D11BlendState _opaque;
 
     public ImageQuadRenderer(GpuDevice gpu)
     {
@@ -25,6 +26,7 @@ public sealed class ImageQuadRenderer : IDisposable
         _pixelShader = gpu.Device.CreatePixelShader(ShaderCompiler.Compile(ShaderResource, "PSMain", "ps_5_0").Span);
         _constants = gpu.Device.CreateBuffer((uint)Marshal.SizeOf<QuadConstants>(), BindFlags.ConstantBuffer);
         _sampler = gpu.Device.CreateSamplerState(SamplerDescription.LinearClamp);
+        _opaque = gpu.Device.CreateBlendState(BlendDescription.Opaque);
     }
 
     public void Draw(ID3D11RenderTargetView target, Size targetSize, ID3D11ShaderResourceView image, RectangleF destination)
@@ -38,6 +40,7 @@ public sealed class ImageQuadRenderer : IDisposable
         context.UpdateSubresource(in constants, _constants);
 
         context.OMSetRenderTargets(target);
+        context.OMSetBlendState(_opaque);
         context.RSSetViewport(0, 0, targetSize.Width, targetSize.Height);
         context.ClearRenderTargetView(target, new Color4(0, 0, 0, 1));
         context.IASetPrimitiveTopology(PrimitiveTopology.TriangleStrip);
@@ -51,6 +54,7 @@ public sealed class ImageQuadRenderer : IDisposable
 
     public void Dispose()
     {
+        _opaque.Dispose();
         _sampler.Dispose();
         _constants.Dispose();
         _pixelShader.Dispose();
