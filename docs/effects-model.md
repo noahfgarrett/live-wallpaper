@@ -89,7 +89,7 @@ The bead is placed so it stays inside its cell.
 **Flow**
 - The arrow is stored in normalized image coordinates. Its speed in image heights per second is `|(flow.x × imageAspect, flow.y)| / 4` (`ArrowSeconds = 4`).
 - In target pixels per second, that speed is multiplied by the image's displayed height, along the arrow's on-screen direction.
-- The editor clamps the aspect-corrected length to 0.02–0.5.
+- The editor clamps the aspect-corrected length to 0.02–0.5, then keeps the normalized length within the valid 0.002–1.
 
 **Cycle (Stretch):** `C = 0.5 + 2.5 × stretch/100` seconds. The phase is integrated on the CPU: `phase = frac(phase + dt / C)`.
 

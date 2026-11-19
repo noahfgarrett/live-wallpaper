@@ -17,7 +17,8 @@ Regions confine an effect to part of the photo, or keep it out of part of the ph
 - **Water regions** each carry a `flow`: the arrow from the region's centroid (the average of its corners) to the arrowhead, in normalized image coordinates. Other effects' regions have none.
 - Shape rules on load and over IPC:
   - When the library loads, a set that an old or hand-edited file could hold but the editor can't produce is repaired: glass and water have `invert` turned off, a glass region without exactly 4 corners is dropped, and a water region without a flow gets the default arrow (straight down, 0.12 image heights).
-  - Anything unsafe still rejects the file, as above. A flow must be finite, with a length of 0.002–1 in normalized coordinates.
+  - A valid flow is finite, with a length of 0.002–1 in normalized coordinates. On load, a finite flow outside that length is scaled to fit, keeping its direction; a zero flow gets the default arrow.
+  - Anything unsafe still rejects the file, as above, including a flow that isn't finite.
   - The engine never repairs. It answers `Failed` to a region set that breaks these rules.
 - A library saved before regions existed loads with no regions, and one saved before Milestone 5 loads with rain, glass and water off and without regions.
 
@@ -77,7 +78,7 @@ In the **Regions** panel (Snow and Rain; Glass and Water differ as described bel
 - **Add water region** drops a 4-corner quad with the default arrow, pointing down. Corners are added, removed and dragged as for snow, and there is no invert switch.
 - Every water region draws its arrow from its centroid. The selected region's arrowhead has a round handle; drag it to aim and lengthen the arrow. The handle is checked before the corners, so it wins where they overlap.
 - **The arrow's length is the speed:** the water crosses one arrow length every 4 seconds. The length is measured in image heights after correcting for the image's aspect ratio, so a horizontal and a vertical arrow of the same on-screen length flow at the same speed.
-- While dragging, the arrowhead is held to the visible part of the image, and the editor clamps the aspect-corrected length to 0.02–0.5 image heights.
+- While dragging, the arrowhead is held to the visible part of the image, and the editor clamps the aspect-corrected length to 0.02–0.5 image heights. On a very tall or wide image it then also keeps the normalized length within 0.002–1, so every arrow it saves is valid.
 - The arrow is stored on its region, so moving, undoing or deleting a region carries its arrow with it.
 
 ### Fixes over the preview

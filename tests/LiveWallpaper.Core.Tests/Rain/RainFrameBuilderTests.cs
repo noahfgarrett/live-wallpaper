@@ -23,10 +23,10 @@ public sealed class RainFrameBuilderTests
     public void Build_After30Days_KeepsShaderValuesBounded()
     {
         var c = default(RainFrameConstants);
-        RainFrameBuilder.Build(30 * 86400 * 1.5, 1e9, 520, new RainSettings(), Target, ref c);
+        RainFrameBuilder.Build((30 * 86400 * 1.5) + 1234.5, 1e9, 520, new RainSettings(), Target, ref c);
 
         var spanX = Target.Width + (2 * c.Margin);
-        Assert.InRange(c.FallPhase, 0f, 0.99999994f);
+        Assert.Equal((float)(1234.5 / RainModel.PeriodSeconds), c.FallPhase, 6);
         Assert.All([c.WindOffsets.X, c.WindOffsets.Y, c.WindOffsets.Z], o => Assert.InRange(o, 0f, spanX));
         Assert.All(
             [c.FallPhase, c.WindOffsets.X, c.WindOffsets.Y, c.WindOffsets.Z, c.WindPxPerSec, c.SpeedMul, c.Exposure, c.Margin, c.Scale, c.Opacity, c.Period, c.StreakCount],

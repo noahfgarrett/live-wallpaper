@@ -395,7 +395,22 @@ public sealed class LibraryStoreTests : IDisposable
     public void Load_GlassRegionWithFivePointsOutsideImage_IsTreatedAsCorrupt() =>
         AssertCorrupt("\"glass\": { \"settings\": { \"enabled\": true, \"dropsPct\": 50, \"dropSizePct\": 50, \"slidingPct\": 40, \"fogPct\": 30 }, \"regions\": { \"regions\": [ { \"points\": [ { \"x\": 0.1, \"y\": 0.1 }, { \"x\": 0.5, \"y\": 0.1 }, { \"x\": 0.6, \"y\": 0.3 }, { \"x\": 0.5, \"y\": 0.5 }, { \"x\": 1.5, \"y\": 0.5 } ] } ], \"invert\": false, \"featherPct\": 1 } }, \"regions\": {");
 
+    private static string WaterSlotWithFlow(string flowX) =>
+        "\"water\": { \"settings\": { \"enabled\": true, \"stretchPct\": 50, \"foamPct\": 30 }, \"regions\": { \"regions\": [ { \"points\": [ { \"x\": 0.1, \"y\": 0.1 }, { \"x\": 0.5, \"y\": 0.1 }, { \"x\": 0.3, \"y\": 0.5 } ], \"flow\": { \"x\": " + flowX + ", \"y\": 0 } } ], \"invert\": false, \"featherPct\": 1 } }, \"regions\": {";
+
     [Fact]
-    public void Load_WaterFlowLongerThanOne_IsTreatedAsCorrupt() =>
-        AssertCorrupt("\"water\": { \"settings\": { \"enabled\": true, \"stretchPct\": 50, \"foamPct\": 30 }, \"regions\": { \"regions\": [ { \"points\": [ { \"x\": 0.1, \"y\": 0.1 }, { \"x\": 0.5, \"y\": 0.1 }, { \"x\": 0.3, \"y\": 0.5 } ], \"flow\": { \"x\": 5, \"y\": 0 } } ], \"invert\": false, \"featherPct\": 1 } }, \"regions\": {");
+    public void Load_WaterFlowLongerThanOne_IsShortenedToAValidFlow()
+    {
+        WriteLibrary(M4Item.Replace("\"regions\": {", WaterSlotWithFlow("5")));
+
+        var item = Assert.Single(_store.Load());
+
+        var flow = Assert.Single(item.Water.Regions.Regions).Flow;
+        Assert.True(EffectRules.IsValidFlow(flow));
+        Assert.Equal(EffectRules.MaxFlowLength, flow?.X ?? 0, 6);
+    }
+
+    [Fact]
+    public void Load_WaterFlowOverflowingToInfinity_IsTreatedAsCorrupt() =>
+        AssertCorrupt(WaterSlotWithFlow("1e400"));
 }

@@ -20,7 +20,7 @@ public readonly record struct NormalizedRect(double Left, double Top, double Rig
 /// <summary>A polygon in normalized image coordinates.</summary>
 public sealed record Region(IReadOnlyList<RegionPoint> Points)
 {
-    /// <summary>Exactly four corners: a plane that future effects may map into with a homography.</summary>
+    /// <summary>Exactly four corners, the shape of a glass pane. Informational only: glass pane rules use the point count directly.</summary>
     public bool IsPlane => Points.Count == 4;
 
     /// <summary>Water only: the direction and strength of the flow, in normalized image coordinates.</summary>

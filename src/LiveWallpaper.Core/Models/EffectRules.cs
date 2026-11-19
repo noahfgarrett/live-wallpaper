@@ -8,10 +8,14 @@ public static class EffectRules
     public const double MinFlowLength = 0.002;
     public const double MaxFlowLength = 1;
 
+    /// <summary>How far inside the length bounds a clamped flow lands, so rounding can't push it back out.</summary>
+    private const double ClampInset = 1e-9;
+
     public static readonly RegionPoint DefaultFlow = new(0, 0.12);
 
     /// <summary>
-    /// Makes a loaded region set obey the effect's shape rules: glass loses non-quads, water gets the default arrow where it has none.
+    /// Makes a loaded region set obey the effect's shape rules: glass loses non-quads, water gets the default arrow where it has none
+    /// and a finite arrow of the wrong length is clamped (a non-finite one is left for <see cref="IsValid"/> to reject).
     /// Snow and rain are returned unchanged. Call it on a set that already passed <see cref="RegionSet.IsValid"/>.
     /// </summary>
     public static RegionSet Repair(EffectKind kind, RegionSet set)
@@ -58,7 +62,29 @@ public static class EffectRules
         }
     }
 
-    private static Region WithFlow(Region region) => region.Flow is null ? region with { Flow = DefaultFlow } : region;
+    private static Region WithFlow(Region region) => region.Flow switch
+    {
+        null => region with { Flow = DefaultFlow },
+        { } f when double.IsFinite(f.X) && double.IsFinite(f.Y) => region with { Flow = ClampFlow(f) },
+        _ => region,
+    };
+
+    /// <summary>Scales a flow into [MinFlowLength, MaxFlowLength], keeping its direction. A zero or non-finite flow becomes the default arrow.</summary>
+    public static RegionPoint ClampFlow(RegionPoint flow)
+    {
+        var length = RegionGeometry.Distance(new RegionPoint(0, 0), flow);
+        if (length <= 0 || !double.IsFinite(length))
+        {
+            return DefaultFlow;
+        }
+        if (length is >= MinFlowLength and <= MaxFlowLength)
+        {
+            return flow;
+        }
+        var target = Math.Clamp(length, MinFlowLength * (1 + ClampInset), MaxFlowLength * (1 - ClampInset));
+        var factor = target / length;
+        return new RegionPoint(flow.X * factor, flow.Y * factor);
+    }
 
     public static bool IsValidFlow(RegionPoint? flow)
     {

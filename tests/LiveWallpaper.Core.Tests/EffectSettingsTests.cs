@@ -72,6 +72,37 @@ public sealed class EffectSettingsTests
     }
 
     [Theory]
+    [InlineData(5, 0, 1, 0)]
+    [InlineData(-3, 4, -0.6, 0.8)]
+    [InlineData(0.001, 0, 0.002, 0)]
+    public void Repair_Water_ClampsOutOfRangeFlowKeepingDirection(double x, double y, double expectedX, double expectedY)
+    {
+        var set = new RegionSet([Triangle() with { Flow = new RegionPoint(x, y) }]);
+
+        var flow = EffectRules.Repair(EffectKind.Water, set).Regions[0].Flow ?? default;
+
+        Assert.True(EffectRules.IsValidFlow(flow));
+        Assert.Equal(expectedX, flow.X, 6);
+        Assert.Equal(expectedY, flow.Y, 6);
+    }
+
+    [Fact]
+    public void Repair_Water_ZeroFlowGetsTheDefaultArrow()
+    {
+        var set = new RegionSet([Triangle() with { Flow = new RegionPoint(0, 0) }]);
+
+        Assert.Equal(EffectRules.DefaultFlow, EffectRules.Repair(EffectKind.Water, set).Regions[0].Flow);
+    }
+
+    [Fact]
+    public void Repair_Water_LeavesNonFiniteFlowToBeRejected()
+    {
+        var set = new RegionSet([Triangle() with { Flow = new RegionPoint(double.PositiveInfinity, 0) }]);
+
+        Assert.False(EffectRules.IsValid(EffectKind.Water, EffectRules.Repair(EffectKind.Water, set)));
+    }
+
+    [Theory]
     [InlineData(EffectKind.Snow)]
     [InlineData(EffectKind.Rain)]
     public void Repair_SnowAndRain_ReturnTheSameInstance(EffectKind kind)

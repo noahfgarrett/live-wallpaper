@@ -403,6 +403,36 @@ public sealed class RegionEditorTests
     }
 
     [Fact]
+    public void Flow_EdgeToEdgeDragOnTallImage_GivesValidFlow()
+    {
+        // A thin strip on the left edge, centroid (0.01, 0.4). On a 0.45 image the drag to the right edge is under MaxArrow
+        // after aspect correction, but longer than one image width.
+        var strip = new Region([new(0, 0.3), new(0.02, 0.3), new(0.02, 0.5), new(0, 0.5)]) { Flow = EffectRules.DefaultFlow };
+        var editor = new RegionEditor(new RegionSet([strip]), RegionEditMode.Flow, imageAspect: 0.45);
+        editor.SetView(FullView);
+        Drag(editor, new(10, 400));
+
+        Drag(editor, new(10, 520), new RegionPoint(1000, 620));
+
+        Assert.True(EffectRules.IsValidFlow(editor.State.Regions[0].Flow));
+    }
+
+    [Fact]
+    public void Flow_ShortestHorizontalArrowOnWideImage_GivesValidFlow()
+    {
+        var editor = new RegionEditor(RegionSet.Empty, RegionEditMode.Flow, imageAspect: 12);
+        editor.SetView(FullView);
+        editor.AddRegion();
+
+        Drag(editor, new(500, 620), new RegionPoint(501, 500));
+
+        var flow = editor.State.Regions[0].Flow ?? default;
+        Assert.True(EffectRules.IsValidFlow(flow));
+        Assert.True(flow.X > 0);
+        Assert.Equal(0, flow.Y, 9);
+    }
+
+    [Fact]
     public void Flow_ArrowDrag_StaysOnVisibleImage()
     {
         var editor = EditorWithQuad(CroppedView, RegionEditMode.Flow);

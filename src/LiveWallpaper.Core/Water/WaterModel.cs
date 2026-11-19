@@ -1,4 +1,5 @@
 using System.Drawing;
+using LiveWallpaper.Core.Models;
 using LiveWallpaper.Core.Regions;
 using LiveWallpaper.Core.Snow;
 
@@ -21,7 +22,10 @@ public static class WaterModel
     public static double MistReachPx(double mistPct, double displayedImageHeightPx) =>
         (0.04 + (0.10 * mistPct / 100)) * displayedImageHeightPx;
 
-    /// <summary>Limits the aspect-corrected arrow length to [MinArrow, MaxArrow]. A zero arrow points down.</summary>
+    /// <summary>
+    /// Limits the aspect-corrected arrow length to [MinArrow, MaxArrow], then keeps the normalized length within
+    /// <see cref="EffectRules.IsValidFlow"/>'s bounds, which win on very tall or wide images. A zero arrow points down.
+    /// </summary>
     public static RegionPoint ClampArrow(RegionPoint flow, double imageAspect)
     {
         var length = Math.Sqrt((flow.X * imageAspect * flow.X * imageAspect) + (flow.Y * flow.Y));
@@ -31,7 +35,7 @@ public static class WaterModel
         }
         var clamped = Math.Clamp(length, MinArrow, MaxArrow);
         var factor = clamped / length;
-        return new RegionPoint(flow.X * factor, flow.Y * factor);
+        return EffectRules.ClampFlow(new RegionPoint(flow.X * factor, flow.Y * factor));
     }
 
     /// <summary>The flow speed in pixels per second, along the arrow's on-screen direction.</summary>
