@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Live Wallpaper Preview</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <main id="stage-wrap">
+        <canvas id="stage" aria-label="Wallpaper preview"></canvas>
+        <svg id="regions" aria-label="Effect regions"></svg>
+
+        <label id="dropzone" class="dropzone">
+            <input id="file" type="file" accept="image/*" hidden>
+            <span class="dropzone-title">Drop a photo here or choose one</span>
+            <span class="dropzone-hint">Your photo stays on this computer.</span>
+        </label>
+
+        <div id="readout" class="readout" hidden>
+            <span id="readout-fps">0 fps</span>
+            <span id="readout-flakes">0 flakes</span>
+        </div>
+    </main>
+
+    <aside id="panel" class="panel">
+        <header class="panel-head">
+            <h1>Live Wallpaper</h1>
+            <button id="panel-toggle" class="icon-button" type="button" aria-expanded="true" aria-controls="panel-body" title="Hide panel">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5" /></svg>
+            </button>
+        </header>
+
+        <div id="panel-body" class="panel-body">
+            <section class="group" aria-labelledby="snow-heading">
+                <div class="group-head">
+                    <h2 id="snow-heading">Snow</h2>
+                    <label class="switch">
+                        <input id="snow-enabled" type="checkbox" checked>
+                        <span class="switch-track" aria-hidden="true"></span>
+                        <span class="visually-hidden">Enable snow</span>
+                    </label>
+                </div>
+
+                <div class="field">
+                    <label for="density">Density</label>
+                    <output for="density" id="density-out">50%</output>
+                    <input id="density" type="range" min="0" max="100" value="50">
+                </div>
+                <div class="field">
+                    <label for="speed">Speed</label>
+                    <output for="speed" id="speed-out">50%</output>
+                    <input id="speed" type="range" min="0" max="100" value="50">
+                </div>
+                <div class="field">
+                    <label for="wind">Wind</label>
+                    <output for="wind" id="wind-out">30%</output>
+                    <input id="wind" type="range" min="0" max="100" value="30">
+                </div>
+                <div class="field">
+                    <label for="size">Flake size</label>
+                    <output for="size" id="size-out">50%</output>
+                    <input id="size" type="range" min="0" max="100" value="50">
+                </div>
+
+                <label class="check">
+                    <input id="motion-blur" type="checkbox">
+                    <span>Motion blur</span>
+                </label>
+
+                <div class="field-row">
+                    <label for="fps">Frame rate</label>
+                    <select id="fps">
+                        <option value="30">30 fps</option>
+                        <option value="60" selected>60 fps</option>
+                        <option value="adaptive">Adaptive</option>
+                    </select>
+                </div>
+                <div class="field-row">
+                    <label for="scaling">Scaling</label>
+                    <select id="scaling">
+                        <option value="fill" selected>Fill</option>
+                        <option value="fit">Fit</option>
+                        <option value="stretch">Stretch</option>
+                        <option value="center">Center</option>
+                    </select>
+                </div>
+            </section>
+
+            <section class="group" aria-labelledby="regions-heading">
+                <div class="group-head">
+                    <h2 id="regions-heading">Regions</h2>
+                </div>
+                <p class="help" id="regions-help">Without regions, snow covers the whole picture. Add a region and drag its corners onto a window or the sky.</p>
+
+                <div class="button-row">
+                    <button id="region-add" class="button primary" type="button">Add region</button>
+                    <button id="region-delete" class="button" type="button" disabled>Delete region</button>
+                </div>
+
+                <label class="check">
+                    <input id="region-invert" type="checkbox">
+                    <span>Snow everywhere except the regions</span>
+                </label>
+                <div class="field">
+                    <label for="feather">Soft edge</label>
+                    <output for="feather" id="feather-out">1.0%</output>
+                    <input id="feather" type="range" min="0" max="10" step="0.1" value="1">
+                </div>
+                <label class="check">
+                    <input id="region-outlines" type="checkbox" checked>
+                    <span>Show outlines</span>
+                </label>
+
+                <div class="button-row">
+                    <button id="undo" class="button" type="button" disabled>Undo</button>
+                    <button id="redo" class="button" type="button" disabled>Redo</button>
+                </div>
+                <p class="help">Click an edge to add a point. Select a point and press Delete to remove it.</p>
+            </section>
+
+            <footer class="panel-foot">
+                <button id="copy-settings" class="button" type="button">Copy settings</button>
+                <span id="copy-status" class="help" role="status"></span>
+            </footer>
+        </div>
+    </aside>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>
