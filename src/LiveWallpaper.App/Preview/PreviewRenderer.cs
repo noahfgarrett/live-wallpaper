@@ -119,7 +119,7 @@ public sealed class PreviewRenderer : IDisposable
                         {
                             (scene, snow) = BuildScene(gpu, background, wanted.Path, wanted.Scaling, size);
                         }
-                        catch (Exception ex) when (ex is ImageLoadException or SharpGenException)
+                        catch (Exception ex) when (ex is not OutOfMemoryException)
                         {
                             Log.Error("preview", "event=scene-failed", ex);
                         }
@@ -152,7 +152,7 @@ public sealed class PreviewRenderer : IDisposable
                 surface?.Dispose();
             }
         }
-        catch (Exception ex) when (ex is SharpGenException or InvalidOperationException)
+        catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             Log.Error("preview", "event=renderer-stopped", ex);
         }

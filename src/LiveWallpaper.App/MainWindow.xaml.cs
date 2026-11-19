@@ -21,6 +21,8 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     private readonly PerformanceView _performanceView;
     private readonly DispatcherTimer _statusTimer = new() { Interval = TimeSpan.FromSeconds(3) };
     private EditorView? _editor;
+    private int _missedStatus;
+    private bool _refreshing;
 
     public MainWindow(EngineConnection engine, AppPage startPage)
     {
@@ -50,7 +52,25 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
 
     public async Task RefreshEngineStatusAsync()
     {
-        LastStatus = await _engine.GetStatusAsync(CancellationToken.None);
+        if (_refreshing)
+        {
+            return;
+        }
+        _refreshing = true;
+        try
+        {
+            var status = await _engine.GetStatusAsync(CancellationToken.None);
+            _missedStatus = status is null ? _missedStatus + 1 : 0;
+            if (status is null && _missedStatus < 2 && LastStatus is not null)
+            {
+                return;
+            }
+            LastStatus = status;
+        }
+        finally
+        {
+            _refreshing = false;
+        }
         if (LastStatus is null)
         {
             EngineDot.Fill = StoppedBrush;

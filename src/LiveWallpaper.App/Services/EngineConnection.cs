@@ -8,8 +8,8 @@ public sealed class EngineConnection(EngineClient client, string engineExePath)
 {
     private static readonly TimeSpan s_pingTimeout = TimeSpan.FromMilliseconds(300);
     private static readonly TimeSpan s_requestTimeout = TimeSpan.FromMilliseconds(800);
-    private const int StartAttempts = 12;
-    private const int StartPollMs = 250;
+    private static readonly TimeSpan s_startBudget = TimeSpan.FromSeconds(3);
+    private const int StartPollMs = 200;
 
     public string EngineExePath => engineExePath;
 
@@ -19,21 +19,25 @@ public sealed class EngineConnection(EngineClient client, string engineExePath)
         {
             return true;
         }
-        if (!File.Exists(engineExePath))
+        var watch = Stopwatch.StartNew();
+        if (!IsEngineProcessRunning())
         {
-            Log.Error("app", "event=engine-missing");
-            return false;
+            if (!File.Exists(engineExePath))
+            {
+                Log.Error("app", "event=engine-missing");
+                return false;
+            }
+            try
+            {
+                using var _ = Process.Start(new ProcessStartInfo(engineExePath) { UseShellExecute = false });
+            }
+            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
+            {
+                Log.Error("app", "event=engine-start-failed", ex);
+                return false;
+            }
         }
-        try
-        {
-            using var _ = Process.Start(new ProcessStartInfo(engineExePath) { UseShellExecute = false });
-        }
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
-        {
-            Log.Error("app", "event=engine-start-failed", ex);
-            return false;
-        }
-        for (var i = 0; i < StartAttempts; i++)
+        while (watch.Elapsed < s_startBudget)
         {
             await Task.Delay(StartPollMs, ct).ConfigureAwait(false);
             if (await PingAsync(ct).ConfigureAwait(false))
@@ -48,6 +52,16 @@ public sealed class EngineConnection(EngineClient client, string engineExePath)
         await client.SendAsync(new GetStatus(), s_requestTimeout, ct).ConfigureAwait(false) is StatusReport report ? report.Status : null;
 
     public Task<EngineResponse?> SendAsync(EngineRequest request, CancellationToken ct) => client.SendAsync(request, s_requestTimeout, ct);
+
+    private static bool IsEngineProcessRunning()
+    {
+        var processes = Process.GetProcessesByName("LiveWallpaper.Engine");
+        foreach (var process in processes)
+        {
+            process.Dispose();
+        }
+        return processes.Length > 0;
+    }
 
     private async Task<bool> PingAsync(CancellationToken ct) =>
         await client.SendAsync(new GetStatus(), s_pingTimeout, ct).ConfigureAwait(false) is StatusReport;

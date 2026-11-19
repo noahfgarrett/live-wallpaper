@@ -15,6 +15,7 @@ public partial class LibraryView : UserControl
     private readonly MainWindow _window;
     private readonly EngineConnection _engine;
     private readonly LibraryService _library;
+    private readonly Dictionary<Guid, LibraryCard> _cards = [];
     private LibraryItem? _pendingRemove;
 
     public LibraryView(MainWindow window, EngineConnection engine, LibraryService library)
@@ -27,19 +28,39 @@ public partial class LibraryView : UserControl
         _window.StatusChanged += (_, status) =>
         {
             ShowEngineState(status);
-            Refresh();
+            UpdateBadges();
         };
     }
 
     public void Refresh()
     {
-        var shown = _window.LastStatus?.Monitors.Where(m => m.IsShown && m.LibraryItemId is not null).Select(m => m.LibraryItemId!.Value).ToHashSet() ?? [];
-        var cards = _library.Load()
-            .OrderByDescending(i => i.ImportedAt)
-            .Select(i => new LibraryCard(i, _library.ThumbnailPath(i), shown.Contains(i.Id)))
-            .ToList();
+        var items = _library.Load().OrderByDescending(i => i.ImportedAt).ToList();
+        var cards = new List<LibraryCard>(items.Count);
+        foreach (var item in items)
+        {
+            if (!_cards.TryGetValue(item.Id, out var card) || card.Item != item)
+            {
+                card = new LibraryCard(item, _library.ThumbnailPath(item));
+                _cards[item.Id] = card;
+            }
+            cards.Add(card);
+        }
+        foreach (var stale in _cards.Keys.Except(items.Select(i => i.Id)).ToList())
+        {
+            _cards.Remove(stale);
+        }
         Cards.ItemsSource = cards;
         EmptyState.Visibility = cards.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        UpdateBadges();
+    }
+
+    private void UpdateBadges()
+    {
+        var shown = _window.LastStatus?.Monitors.Where(m => m.IsShown && m.LibraryItemId is not null).Select(m => m.LibraryItemId!.Value).ToHashSet() ?? [];
+        foreach (var card in _cards.Values)
+        {
+            card.IsOnDesktop = shown.Contains(card.Item.Id);
+        }
     }
 
     private void ShowEngineState(EngineStatus? status)
@@ -121,11 +142,17 @@ public partial class LibraryView : UserControl
         {
             return;
         }
-        _library.Remove(item.Id);
-        if (_window.LastStatus?.Monitors.Any(m => m.LibraryItemId == item.Id) == true)
+        try
         {
-            await _engine.SendAsync(new Reload(), CancellationToken.None);
+            _library.Remove(item.Id);
         }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            ShowMessage(InfoBarSeverity.Error, "Couldn't remove it", $"{item.DisplayName} couldn't be removed from the library.");
+            return;
+        }
+        Refresh();
+        await _engine.SendAsync(new Reload(), CancellationToken.None);
         await _window.RefreshEngineStatusAsync();
         ShowMessage(InfoBarSeverity.Informational, "Removed from the library", $"{item.DisplayName} was removed. The original file wasn't touched.");
     }

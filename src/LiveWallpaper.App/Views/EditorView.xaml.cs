@@ -156,7 +156,7 @@ public partial class EditorView : UserControl
         {
             StatusText.Text = ex.Message;
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             Log.Error("app", "event=save-failed", ex);
             StatusText.Text = "Your changes couldn't be saved.";

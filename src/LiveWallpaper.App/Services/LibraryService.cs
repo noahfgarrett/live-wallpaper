@@ -34,7 +34,7 @@ public sealed class LibraryService
                 {
                     await Task.Run(() => ThumbnailWriter.Write(_store.ImagePath(item), _store.ThumbnailPath(item))).ConfigureAwait(false);
                 }
-                catch (ImageLoadException ex)
+                catch (Exception ex) when (ex is ImageLoadException or IOException or UnauthorizedAccessException)
                 {
                     Log.Error("app", "event=thumbnail-failed", ex);
                 }

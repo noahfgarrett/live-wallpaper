@@ -15,6 +15,7 @@ public partial class App : Application
     private EventWaitHandle? _activateSignal;
     private RegisteredWaitHandle? _exitWait;
     private RegisteredWaitHandle? _activateWait;
+    private DateTime _lastErrorDialogUtc = DateTime.MinValue;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -72,7 +73,12 @@ public partial class App : Application
     private void OnUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
         Log.Error("app", "event=unhandled", e.Exception);
-        MessageBox.Show("Something went wrong. The details are in the Live Wallpaper log.", "Live Wallpaper", MessageBoxButton.OK, MessageBoxImage.Warning);
         e.Handled = true;
+        if (DateTime.UtcNow - _lastErrorDialogUtc < TimeSpan.FromSeconds(30))
+        {
+            return;
+        }
+        _lastErrorDialogUtc = DateTime.UtcNow;
+        MessageBox.Show("Something went wrong. The details are in the Live Wallpaper log.", "Live Wallpaper", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 }
