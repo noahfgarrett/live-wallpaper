@@ -1,6 +1,9 @@
 // @ts-check
 import { createRenderer } from "./renderer.js";
 import { flakeCount, speedMultiplier, sizeMultiplier, FallClock, WindModel, LAYERS } from "./snowModel.js";
+import { History } from "./history.js";
+import { createRegionEditor } from "./regionEditor.js";
+import { buildMask } from "./mask.js";
 
 /** @typedef {import("./scaling.js").ScalingMode} ScalingMode */
 
@@ -262,6 +265,85 @@ function frame(now) {
     }
 }
 requestAnimationFrame(frame);
+
+const svg = /** @type {SVGSVGElement} */ (/** @type {unknown} */ (el("regions")));
+const regionButtons = {
+    add: /** @type {HTMLButtonElement} */ (el("region-add")),
+    remove: /** @type {HTMLButtonElement} */ (el("region-delete")),
+    undo: /** @type {HTMLButtonElement} */ (el("undo")),
+    redo: /** @type {HTMLButtonElement} */ (el("redo")),
+};
+const invertInput = /** @type {HTMLInputElement} */ (el("region-invert"));
+const featherInput = /** @type {HTMLInputElement} */ (el("feather"));
+const outlinesInput = /** @type {HTMLInputElement} */ (el("region-outlines"));
+const copyButton = /** @type {HTMLButtonElement} */ (el("copy-settings"));
+const copyStatus = el("copy-status");
+
+/** @type {History<import("./regions.js").RegionSet>} */
+const regionHistory = new History({ regions: [], invert: false, featherPct: Number(featherInput.value) });
+
+/** @returns {import("./scaling.js").Rect | null} */
+function cssDestination() {
+    const d = renderer.destination();
+    if (!d || canvas.clientWidth === 0) {
+        return null;
+    }
+    const k = canvas.width / canvas.clientWidth;
+    return { x: d.x / k, y: d.y / k, w: d.w / k, h: d.h / k };
+}
+
+/**
+ * @param {import("./regions.js").RegionSet} set
+ * @returns {void}
+ */
+function applyRegions(set) {
+    const d = renderer.destination();
+    renderer.setMask(d ? buildMask(set, d, canvas.width, canvas.height) : null);
+    invertInput.checked = set.invert;
+    featherInput.value = String(set.featherPct);
+    featherInput.dispatchEvent(new Event("input"));
+    regionButtons.remove.disabled = editor.selectedRegionId() === null;
+    regionButtons.undo.disabled = !regionHistory.canUndo;
+    regionButtons.redo.disabled = !regionHistory.canRedo;
+}
+
+const editor = createRegionEditor(svg, cssDestination, regionHistory, applyRegions);
+
+layoutListeners.add(() => {
+    editor.setEnabled(renderer.destination() !== null);
+    editor.render();
+    applyRegions(editor.state());
+});
+
+regionButtons.add.addEventListener("click", () => {
+    if (renderer.destination()) {
+        editor.addRegion();
+    }
+});
+regionButtons.remove.addEventListener("click", () => editor.deleteSelected());
+regionButtons.undo.addEventListener("click", () => editor.undo());
+regionButtons.redo.addEventListener("click", () => editor.redo());
+invertInput.addEventListener("change", () => editor.update({ invert: invertInput.checked }, true));
+featherInput.addEventListener("input", (event) => {
+    if (event.isTrusted) {
+        editor.update({ featherPct: Number(featherInput.value) }, false);
+    }
+});
+featherInput.addEventListener("change", () => editor.update({ featherPct: Number(featherInput.value) }, true));
+outlinesInput.addEventListener("change", () => svg.classList.toggle("hide-outlines", !outlinesInput.checked));
+
+copyButton.addEventListener("click", async () => {
+    const json = JSON.stringify({ ...currentSettings(), regions: editor.state() }, null, 4);
+    try {
+        await navigator.clipboard.writeText(json);
+        copyStatus.textContent = "Copied";
+    } catch {
+        copyStatus.textContent = "Couldn't copy. Clipboard access was blocked.";
+    }
+    setTimeout(() => {
+        copyStatus.textContent = "";
+    }, 2500);
+});
 
 const debugImage = params.get("image");
 if (debugImage && /^\.local\/[\w.-]+$/.test(debugImage)) {
