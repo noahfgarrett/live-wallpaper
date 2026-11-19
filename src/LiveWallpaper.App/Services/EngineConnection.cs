@@ -37,21 +37,22 @@ public sealed class EngineConnection(EngineClient client, string engineExePath)
     /// </summary>
     public async Task<EngineStart> EnsureRunningAsync(CancellationToken ct)
     {
-        if (await TryGetStatusAsync(ct).ConfigureAwait(false) is { } status)
+        var status = await TryGetStatusAsync(ct).ConfigureAwait(false);
+        if (status is not null && !EngineProtocol.NeedsReplacement(status))
         {
-            if (!EngineProtocol.NeedsReplacement(status))
-            {
-                return EngineStart.Running;
-            }
-            await ShutDownOutdatedEngineAsync(ct).ConfigureAwait(false);
+            return EngineStart.Running;
         }
-        var watch = Stopwatch.StartNew();
-        var otherEngineRunning = IsEngineProcessRunning();
         if (!File.Exists(engineExePath))
         {
             Log.Error("app", "event=engine-missing");
             return EngineStart.CouldNotStart;
         }
+        if (status is not null)
+        {
+            await ShutDownOutdatedEngineAsync(ct).ConfigureAwait(false);
+        }
+        var watch = Stopwatch.StartNew();
+        var otherEngineRunning = IsEngineProcessRunning();
         try
         {
             using var _ = Process.Start(new ProcessStartInfo(engineExePath) { UseShellExecute = false });
@@ -66,12 +67,22 @@ public sealed class EngineConnection(EngineClient client, string engineExePath)
             Log.Info("app", "event=engine-not-answering action=start-replacement");
         }
         var budget = otherEngineRunning ? s_takeoverBudget : s_startBudget;
+        var hasLoggedOutdated = false;
         while (watch.Elapsed < budget)
         {
             await Task.Delay(StartPollMs, ct).ConfigureAwait(false);
-            if (await TryGetStatusAsync(ct).ConfigureAwait(false) is { } started && !EngineProtocol.NeedsReplacement(started))
+            if (await TryGetStatusAsync(ct).ConfigureAwait(false) is not { } started)
+            {
+                continue;
+            }
+            if (!EngineProtocol.NeedsReplacement(started))
             {
                 return EngineStart.Running;
+            }
+            if (!hasLoggedOutdated)
+            {
+                Log.Info("app", "event=engine-outdated action=ignored");
+                hasLoggedOutdated = true;
             }
         }
         return otherEngineRunning ? EngineStart.OlderEngineInTheWay : EngineStart.CouldNotStart;
