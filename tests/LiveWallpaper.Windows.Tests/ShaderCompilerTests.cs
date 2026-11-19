@@ -14,6 +14,16 @@ public sealed class ShaderCompilerTests
         Assert.False(ShaderCompiler.Compile(ImageQuadRenderer.ShaderResource, entryPoint, profile).IsEmpty);
     }
 
+    [Theory]
+    [InlineData("VSMain", "vs_5_0")]
+    [InlineData("PSMain", "ps_5_0")]
+    public void Rain_Compiles(string entryPoint, string profile)
+    {
+        WindowsOnly.Require();
+
+        Assert.False(ShaderCompiler.Compile(RainEffect.ShaderResource, entryPoint, profile).IsEmpty);
+    }
+
     [Fact]
     public void Compile_MissingResource_Throws()
     {
