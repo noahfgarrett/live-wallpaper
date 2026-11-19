@@ -1,0 +1,11 @@
+{
+    "osVersion": "10.0.26100",
+    "windows": [
+        { "handle": 1001, "className": "Shell_TrayWnd", "parentHandle": 0, "zOrder": 0, "isVisible": true, "exStyle": 0, "x": 0, "y": 1032, "width": 1920, "height": 48 },
+        { "handle": 2001, "className": "WorkerW", "parentHandle": 0, "zOrder": 30, "isVisible": false, "exStyle": 128, "x": 0, "y": 0, "width": 1920, "height": 1080 },
+        { "handle": 3001, "className": "Progman", "parentHandle": 0, "zOrder": 42, "isVisible": true, "exStyle": 2097280, "x": 0, "y": 0, "width": 1920, "height": 1080 },
+        { "handle": 3002, "className": "SHELLDLL_DefView", "parentHandle": 3001, "zOrder": 0, "isVisible": true, "exStyle": 524288, "x": 0, "y": 0, "width": 1920, "height": 1080 },
+        { "handle": 3003, "className": "WorkerW", "parentHandle": 3001, "zOrder": 1, "isVisible": true, "exStyle": 0, "x": 0, "y": 0, "width": 8, "height": 8 },
+        { "handle": 3004, "className": "WorkerW", "parentHandle": 3001, "zOrder": 2, "isVisible": true, "exStyle": 0, "x": 0, "y": 0, "width": 1920, "height": 1080 }
+    ]
+}
