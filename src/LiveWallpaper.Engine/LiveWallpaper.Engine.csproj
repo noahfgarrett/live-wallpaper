@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>WinExe</OutputType>
+        <TargetFramework>net10.0-windows</TargetFramework>
+        <RootNamespace>LiveWallpaper.Engine</RootNamespace>
+        <AssemblyName>LiveWallpaper.Engine</AssemblyName>
+        <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+        <ApplicationManifest>app.manifest</ApplicationManifest>
+        <Product>Live Wallpaper</Product>
+        <AssemblyTitle>Live Wallpaper Engine</AssemblyTitle>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\LiveWallpaper.Core\LiveWallpaper.Core.csproj" />
+        <ProjectReference Include="..\LiveWallpaper.Windows\LiveWallpaper.Windows.csproj" />
+        <ProjectReference Include="..\LiveWallpaper.Media\LiveWallpaper.Media.csproj" />
+        <ProjectReference Include="..\LiveWallpaper.Rendering\LiveWallpaper.Rendering.csproj" />
+    </ItemGroup>
+</Project>

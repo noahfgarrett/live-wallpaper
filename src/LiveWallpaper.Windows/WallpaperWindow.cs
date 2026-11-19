@@ -35,6 +35,8 @@ public sealed unsafe class WallpaperWindow : IDisposable
         return new WallpaperWindow(handle);
     }
 
+    public void ShowWithoutActivating() => User32.ShowWindow(Handle, User32.SW_SHOWNA);
+
     public void Dispose()
     {
         if (User32.IsWindow(Handle))
