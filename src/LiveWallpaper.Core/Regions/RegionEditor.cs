@@ -1,3 +1,6 @@
+using LiveWallpaper.Core.Models;
+using LiveWallpaper.Core.Water;
+
 namespace LiveWallpaper.Core.Regions;
 
 public enum OverlayShapeKind
@@ -7,9 +10,25 @@ public enum OverlayShapeKind
     Handle,
     SelectedHandle,
     Ghost,
+    Arrow,
+    ArrowHandle,
 }
 
-/// <summary>One shape to draw over the preview, in image coordinates. Circles (handles, the ghost) have <c>A == B</c>.</summary>
+/// <summary>
+/// Free: polygons with corners added and removed (snow, rain). Plane: fixed 4-corner panes (glass).
+/// Flow: polygons with a flow arrow each (water).
+/// </summary>
+public enum RegionEditMode
+{
+    Free,
+    Plane,
+    Flow,
+}
+
+/// <summary>
+/// One shape to draw over the preview, in image coordinates. Circles (handles, the ghost) have <c>A == B</c>;
+/// an arrow runs from its tail <c>A</c> to its head <c>B</c>.
+/// </summary>
 public readonly record struct OverlayShape(OverlayShapeKind Kind, RegionPoint A, RegionPoint B);
 
 /// <summary>
@@ -25,6 +44,7 @@ public sealed class RegionEditor
     public const double VertexClearanceDip = 12;
 
     private readonly History<RegionSet> _history;
+    private readonly double _imageAspect;
     private RegionSet _working;
     private RegionView? _view;
     private Drag? _drag;
@@ -32,8 +52,15 @@ public sealed class RegionEditor
     private Ghost? _ghost;
     private bool _enabled = true;
 
-    public RegionEditor(RegionSet initial)
+    /// <summary><paramref name="imageAspect"/> is the source image's width over its height, for clamping flow arrows.</summary>
+    public RegionEditor(RegionSet initial, RegionEditMode mode = RegionEditMode.Free, double imageAspect = 1)
     {
+        if (!double.IsFinite(imageAspect) || imageAspect <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(imageAspect), imageAspect, "The image aspect must be a positive number.");
+        }
+        Mode = mode;
+        _imageAspect = imageAspect;
         _history = new History<RegionSet>(initial);
         _working = initial;
     }
@@ -43,6 +70,8 @@ public sealed class RegionEditor
 
     /// <summary>The regions as they look now, including a drag or soft-edge change that isn't committed yet.</summary>
     public RegionSet State => _working;
+
+    public RegionEditMode Mode { get; }
 
     public int? SelectedRegion { get; private set; }
 
@@ -91,6 +120,14 @@ public sealed class RegionEditor
         }
         if (SelectedRegion is { } selected)
         {
+            if (ArrowHandleAt(selected, screen))
+            {
+                SelectedVertex = null;
+                _drag = new Drag.Arrow(selected);
+                _ghost = null;
+                Raise();
+                return;
+            }
             if (HandleAt(selected, screen) is { } vertex)
             {
                 SelectedVertex = vertex;
@@ -138,6 +175,16 @@ public sealed class RegionEditor
                 _dragChanged = true;
                 Raise();
                 return;
+            case Drag.Arrow arrow:
+                var head = view.ToImage(screen);
+                _working = MapRegion(arrow.Region, r =>
+                {
+                    var centroid = Centroid(r);
+                    return r with { Flow = WaterModel.ClampArrow(new RegionPoint(head.X - centroid.X, head.Y - centroid.Y), _imageAspect) };
+                });
+                _dragChanged = true;
+                Raise();
+                return;
             case null:
                 var ghost = GhostAt(screen);
                 if (ghost != _ghost)
@@ -167,7 +214,8 @@ public sealed class RegionEditor
     /// <summary>Removes the selected region's vertex under the pointer (right-click).</summary>
     public void RemoveVertexAt(RegionPoint screen)
     {
-        if (!_enabled || _view is null || _drag is not null || SelectedRegion is not { } selected || HandleAt(selected, screen) is not { } vertex)
+        if (!_enabled || _view is null || _drag is not null || Mode == RegionEditMode.Plane
+            || SelectedRegion is not { } selected || HandleAt(selected, screen) is not { } vertex)
         {
             return;
         }
@@ -180,7 +228,7 @@ public sealed class RegionEditor
     /// <summary>Removes the selected vertex (Delete key). Returns true when one was removed.</summary>
     public bool DeleteSelectedVertex()
     {
-        if (!_enabled || _drag is not null || SelectedRegion is not { } selected || SelectedVertex is not { } vertex
+        if (!_enabled || _drag is not null || Mode == RegionEditMode.Plane || SelectedRegion is not { } selected || SelectedVertex is not { } vertex
             || _working.Regions[selected].Points.Count <= RegionGeometry.MinPoints)
         {
             return false;
@@ -200,7 +248,12 @@ public sealed class RegionEditor
         }
         _drag = null;
         _dragChanged = false;
-        _working = _working with { Regions = [.. _working.Regions, RegionGeometry.CreateQuad(Visible)] };
+        var quad = RegionGeometry.CreateQuad(Visible);
+        if (Mode == RegionEditMode.Flow)
+        {
+            quad = quad with { Flow = EffectRules.DefaultFlow };
+        }
+        _working = _working with { Regions = [.. _working.Regions, quad] };
         SelectedRegion = _enabled ? _working.Regions.Count - 1 : null;
         SelectedVertex = null;
         _ghost = null;
@@ -220,8 +273,13 @@ public sealed class RegionEditor
         Raise();
     }
 
+    /// <summary>Only snow and rain (<see cref="RegionEditMode.Free"/>) can be inverted; other modes ignore it.</summary>
     public void SetInvert(bool invert)
     {
+        if (Mode != RegionEditMode.Free)
+        {
+            return;
+        }
         _working = _working with { Invert = invert };
         Commit();
         Raise();
@@ -285,6 +343,18 @@ public sealed class RegionEditor
                 shapes.Add(new OverlayShape(OverlayShapeKind.Ghost, ghost.Point, ghost.Point));
             }
         }
+        if (Mode == RegionEditMode.Flow)
+        {
+            foreach (var region in _working.Regions)
+            {
+                shapes.Add(new OverlayShape(OverlayShapeKind.Arrow, Centroid(region), ArrowHead(region)));
+            }
+            if (SelectedRegion is { } withHandle)
+            {
+                var head = ArrowHead(_working.Regions[withHandle]);
+                shapes.Add(new OverlayShape(OverlayShapeKind.ArrowHandle, head, head));
+            }
+        }
         return shapes;
     }
 
@@ -294,6 +364,17 @@ public sealed class RegionEditor
         {
             shapes.Add(new OverlayShape(kind, region.Points[i], region.Points[(i + 1) % region.Points.Count]));
         }
+    }
+
+    /// <summary>The average of the corners: where a region's flow arrow starts (as in the tuning spike).</summary>
+    private static RegionPoint Centroid(Region region) =>
+        new(region.Points.Average(p => p.X), region.Points.Average(p => p.Y));
+
+    private static RegionPoint ArrowHead(Region region)
+    {
+        var centroid = Centroid(region);
+        var flow = region.Flow ?? EffectRules.DefaultFlow;
+        return new RegionPoint(centroid.X + flow.X, centroid.Y + flow.Y);
     }
 
     private void Commit()
@@ -341,9 +422,13 @@ public sealed class RegionEditor
         return best;
     }
 
+    private bool ArrowHandleAt(int regionIndex, RegionPoint screen) =>
+        Mode == RegionEditMode.Flow && _view is { } view
+        && RegionGeometry.Distance(view.ToScreen(ArrowHead(_working.Regions[regionIndex])), screen) <= HandleHitDip * view.Scale;
+
     private Ghost? GhostAt(RegionPoint screen)
     {
-        if (_view is not { } view || SelectedRegion is not { } selected)
+        if (Mode == RegionEditMode.Plane || _view is not { } view || SelectedRegion is not { } selected)
         {
             return null;
         }
@@ -389,5 +474,7 @@ public sealed class RegionEditor
         public sealed record Vertex(int Region, int Index) : Drag;
 
         public sealed record Body(int Region, RegionPoint Start, Region Origin) : Drag;
+
+        public sealed record Arrow(int Region) : Drag;
     }
 }
