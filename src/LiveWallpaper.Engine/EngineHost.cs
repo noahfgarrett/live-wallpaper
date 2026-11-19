@@ -242,6 +242,17 @@ public sealed class EngineHost
                 }
                 _needsPresent = true;
                 return new Ok();
+            case UpdateRegions update:
+                if (update.Regions is null || !update.Regions.IsValid)
+                {
+                    return new Failed("Those regions aren't valid.");
+                }
+                foreach (var wallpaper in _wallpapers.Where(w => w.ItemId == update.LibraryItemId))
+                {
+                    wallpaper.Scene.SetRegions(update.Regions);
+                }
+                _needsPresent = true;
+                return new Ok();
             case SetPaused pause:
                 _paused = pause.Paused;
                 _needsPresent = true;
@@ -522,6 +533,7 @@ public sealed class EngineHost
             var snow = new SnowEffect(_gpu, Seed(image.Monitor.Id));
             scene.Effects.Add(snow);
             snow.Apply(image.Item.Snow);
+            scene.SetRegions(image.Item.Regions);
 
             window = WallpaperWindow.Create();
             DesktopHost.Attach(window.Handle, _plan, image.Monitor.Bounds);
