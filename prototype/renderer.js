@@ -1,5 +1,5 @@
 // @ts-check
-import { LAYERS, REFERENCE_HEIGHT_PX, MAX_FLAKES } from "./snowModel.js";
+import { LAYERS, REFERENCE_HEIGHT_PX, MAX_FLAKES, wrapMarginPx } from "./snowModel.js";
 import { computeDestination } from "./scaling.js";
 import { buildFlakeAtlas, ATLAS_CELLS } from "./flakeAtlas.js";
 
@@ -196,7 +196,6 @@ export function createRenderer(canvas) {
         shares[i] = cumulative;
     });
     shares[2] = 1.01;
-    const maxSizePx = Math.max(...LAYERS.map((l) => l.sizePx[1]));
 
     const u = uniformLocator(gl);
 
@@ -275,7 +274,7 @@ export function createRenderer(canvas) {
             gl.uniform1f(u(snowProgram, "uTime"), state.timeSec);
             gl.uniform1f(u(snowProgram, "uSizeMul"), state.sizeMul);
             gl.uniform1f(u(snowProgram, "uScale"), scale);
-            gl.uniform1f(u(snowProgram, "uMargin"), maxSizePx * 1.5 * scale * state.sizeMul + 40 * scale);
+            gl.uniform1f(u(snowProgram, "uMargin"), wrapMarginPx(scale));
             gl.uniform1f(u(snowProgram, "uBlur"), state.motionBlur ? 1 : 0);
             gl.uniform3fv(u(snowProgram, "uShares"), shares);
             gl.uniform4fv(u(snowProgram, "uLayerA"), layerA);

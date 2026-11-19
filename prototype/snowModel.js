@@ -81,6 +81,17 @@ export function sizeMultiplier(sizePct) {
 }
 
 /**
+ * Off-screen band flakes wrap through. It must not depend on any setting:
+ * the shader wraps with mod(…, span), so a changing span would teleport every flake.
+ * @param {number} scale Canvas height / reference height.
+ * @returns {number}
+ */
+export function wrapMarginPx(scale) {
+    const largest = Math.max(...LAYERS.map((l) => l.sizePx[1])) * sizeMultiplier(100);
+    return (largest * 1.5 + 40) * scale;
+}
+
+/**
  * Accumulates fall time so a speed change alters velocity, never position.
  */
 export class FallClock {

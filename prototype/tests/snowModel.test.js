@@ -71,3 +71,10 @@ test("gusts vary the wind over time", () => {
     }
     assert.ok(speeds.size > 10);
 });
+
+test("wrap margin does not depend on the size setting", async () => {
+    const { wrapMarginPx, sizeMultiplier } = await import("../snowModel.js");
+    const largest = Math.max(...LAYERS.map((l) => l.sizePx[1])) * sizeMultiplier(100);
+    assert.equal(wrapMarginPx(1), largest * 1.5 + 40);
+    assert.equal(wrapMarginPx(2), wrapMarginPx(1) * 2);
+});
