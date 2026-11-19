@@ -126,4 +126,26 @@ public sealed class SnowEffectTests
 
         Assert.Equal(1100, scene.ActiveParticles);
     }
+
+    [Fact]
+    public void Snow_TurnedOffAfterRunning_DrawsNothingEvenBeforeTheNextUpdate()
+    {
+        WindowsOnly.Require();
+        using var gpu = GpuDevice.Create(useWarp: true);
+        using var background = new ImageQuadRenderer(gpu);
+        using var target = new OffscreenTarget(gpu, Target);
+        using var scene = new WallpaperScene(background, gpu.CreateImageTexture(OffscreenTarget.Solid(80, 30, 10)), new RectangleF(0, 0, Target.Width, Target.Height));
+        var effect = new SnowEffect(gpu, 7);
+        effect.Apply(new SnowSettings(DensityPct: 100, SizePct: 100));
+        scene.Effects.Add(effect);
+        for (var i = 1; i <= 30; i++)
+        {
+            scene.Update(new FrameTime(1.0 / 60, i / 60.0), Target);
+        }
+
+        effect.Apply(new SnowSettings(Enabled: false));
+        scene.Render(target.View, Target);
+
+        Assert.Equal(Render(null), target.ReadBack());
+    }
 }

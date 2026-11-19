@@ -54,7 +54,7 @@ public sealed unsafe class TrayIcon : IDisposable
         return _added;
     }
 
-    public TrayCommand HandleCallback(nint lParam, bool isPaused, IReadOnlyList<(Guid Id, string Name)> recent, out Guid recentId)
+    public TrayCommand HandleCallback(nint lParam, bool isPaused, Func<IReadOnlyList<(Guid Id, string Name)>> recent, out Guid recentId)
     {
         recentId = Guid.Empty;
         var notification = (uint)(lParam & 0xFFFF);
@@ -65,7 +65,7 @@ public sealed unsafe class TrayIcon : IDisposable
             case User32.NIN_KEYSELECT:
                 return TrayCommand.OpenApp;
             case User32.WM_CONTEXTMENU:
-                return ShowMenu(isPaused, recent, out recentId);
+                return ShowMenu(isPaused, recent(), out recentId);
             default:
                 return TrayCommand.None;
         }
@@ -100,7 +100,7 @@ public sealed unsafe class TrayIcon : IDisposable
             }
             for (var i = 0; i < recent.Count; i++)
             {
-                User32.AppendMenu(submenu, User32.MF_STRING, (nuint)(RecentBaseId + i), recent[i].Name);
+                User32.AppendMenu(submenu, User32.MF_STRING, (nuint)(RecentBaseId + i), recent[i].Name.Replace("&", "&&", StringComparison.Ordinal));
             }
             User32.AppendMenu(menu, User32.MF_POPUP, (nuint)submenu, "Change wallpaper");
             User32.AppendMenu(menu, User32.MF_STRING, SettingsId, "Settings");

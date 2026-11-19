@@ -43,6 +43,7 @@ public sealed class EngineHost
     private AppSettings _settings = new();
     private TrayIcon? _tray;
     private string? _problem;
+    private volatile bool _stopping;
     private bool _paused;
     private bool _needsPresent;
     private bool _onBattery;
@@ -102,6 +103,8 @@ public sealed class EngineHost
             exitCode = 3;
         }
 
+        host._stopping = true;
+        host.FailPendingRequests();
         server.DisposeAsync().AsTask().GetAwaiter().GetResult();
         host.FailPendingRequests();
         host.Teardown();
@@ -129,6 +132,10 @@ public sealed class EngineHost
 
     private Task<EngineResponse> EnqueueRequest(EngineRequest request)
     {
+        if (_stopping)
+        {
+            return Task.FromResult<EngineResponse>(new Failed("The engine is shutting down."));
+        }
         var pending = new PendingRequest(request, new TaskCompletionSource<EngineResponse>(TaskCreationOptions.RunContinuationsAsynchronously));
         _requests.Enqueue(pending);
         _loop.RequestFrame();
@@ -158,6 +165,10 @@ public sealed class EngineHost
                 if (animated)
                 {
                     wallpaper.Scene.Update(time, size);
+                }
+                else if (!_paused)
+                {
+                    wallpaper.Scene.Update(new FrameTime(0, now), size);
                 }
                 wallpaper.Scene.Render(wallpaper.Surface.BackBuffer, size);
                 wallpaper.Surface.Present(0);
@@ -260,7 +271,7 @@ public sealed class EngineHost
 
     private EngineResponse ApplyItem(Guid itemId, string selector, WallpaperScaling scaling)
     {
-        if (_library.Load().All(i => i.Id != itemId))
+        if (_library.LoadReadOnly().All(i => i.Id != itemId))
         {
             return new Failed("That image is no longer in the library.");
         }
@@ -273,6 +284,14 @@ public sealed class EngineHost
         _settings = _settings with { Monitors = next };
         _store.Save(_settings);
         Rebuild();
+
+        var targets = string.Equals(selector, MonitorAssignments.AllMonitors, StringComparison.OrdinalIgnoreCase)
+            ? monitorIds
+            : monitorIds.Where(id => string.Equals(id, selector, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (!targets.Any(id => _wallpapers.Any(w => w.Monitor.Id == id && w.ItemId == itemId)))
+        {
+            return new Failed($"Saved, but it couldn't be shown on your desktop. {_problem ?? "The details are in the engine log."}");
+        }
         return new Ok();
     }
 
@@ -297,12 +316,12 @@ public sealed class EngineHost
         {
             return false;
         }
-        var recent = _library.Load()
+        IReadOnlyList<(Guid Id, string Name)> Recent() => _library.LoadReadOnly()
             .OrderByDescending(i => i.ImportedAt)
             .Take(RecentItemCount)
             .Select(i => (i.Id, i.DisplayName))
             .ToList();
-        switch (_tray.HandleCallback(lParam, _paused, recent, out var recentId))
+        switch (_tray.HandleCallback(lParam, _paused, Recent, out var recentId))
         {
             case TrayCommand.OpenApp:
                 LaunchApp(string.Empty);
@@ -393,8 +412,13 @@ public sealed class EngineHost
 
     private void Rebuild()
     {
+        var previouslyShown = _wallpapers.Select(w => w.Monitor.Id).ToList();
         Teardown();
         Build();
+        if (previouslyShown.Any(id => _wallpapers.All(w => w.Monitor.Id != id)))
+        {
+            DesktopRestorer.RestoreDesktop();
+        }
         _loop.RequestFrame();
     }
 
@@ -408,9 +432,18 @@ public sealed class EngineHost
         _settings = load.Settings;
         _problem = null;
 
+        var library = _library.LoadReadOnly();
+        var pruned = _settings.Monitors.Where(a => library.Any(i => i.Id == a.LibraryItemId)).ToList();
+        if (pruned.Count != _settings.Monitors.Count)
+        {
+            _settings = _settings with { Monitors = pruned };
+            _store.Save(_settings);
+            Log.Info("engine", $"event=pruned-assignments removed={load.Settings.Monitors.Count - pruned.Count}");
+        }
+
         var monitors = MonitorEnumerator.Enumerate();
         _refreshHz = monitors.FirstOrDefault(m => m.IsPrimary)?.RefreshHz ?? 60;
-        var prepared = PrepareImages(monitors, _settings.Monitors, _library.Load());
+        var prepared = PrepareImages(monitors, _settings.Monitors, library);
         if (prepared.Count == 0)
         {
             Log.Info("engine", $"event=nothing-to-show assignments={_settings.Monitors.Count}");

@@ -79,7 +79,7 @@ public sealed unsafe class SnowEffect : IEffect
 
     public void Render(ID3D11RenderTargetView target, Size targetPixels)
     {
-        if (_count == 0)
+        if (_count == 0 || !Volatile.Read(ref _settings).Enabled)
         {
             return;
         }
