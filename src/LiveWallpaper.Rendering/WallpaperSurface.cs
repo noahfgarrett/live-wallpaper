@@ -50,7 +50,7 @@ public sealed class WallpaperSurface : IDisposable
         PixelSize = pixelSize;
     }
 
-    public void Present() => _swapChain.Present(1, PresentFlags.None).CheckError();
+    public void Present(uint syncInterval = 1) => _swapChain.Present(syncInterval, PresentFlags.None).CheckError();
 
     public void Dispose()
     {

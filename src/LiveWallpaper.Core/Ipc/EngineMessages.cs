@@ -48,7 +48,8 @@ public sealed record EngineStatus(
     double CpuPercent,
     int ActiveParticles,
     IReadOnlyList<MonitorStatus> Monitors,
-    AppSettings Settings);
+    AppSettings Settings,
+    string? Problem);
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, RespectNullableAnnotations = true, RespectRequiredConstructorParameters = true)]
 [JsonSerializable(typeof(EngineRequest))]
