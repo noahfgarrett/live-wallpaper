@@ -1,5 +1,6 @@
 using System.Drawing;
 using LiveWallpaper.Core.Regions;
+using LiveWallpaper.Core.Snow;
 
 namespace LiveWallpaper.Core.Water;
 
@@ -15,7 +16,7 @@ public static class WaterModel
     /// <summary>The longest mist reach, as a fraction of the displayed image height.</summary>
     public const double MaxMistReachFraction = 0.14;
 
-    public static double CycleSeconds(double stretchPct) => 0.5 + (2.5 * stretchPct / 100);
+    public static double CycleSeconds(double stretchPct) => 0.5 + (2.5 * SnowModel.ClampPct(stretchPct) / 100);
 
     public static double MistReachPx(double mistPct, double displayedImageHeightPx) =>
         (0.04 + (0.10 * mistPct / 100)) * displayedImageHeightPx;

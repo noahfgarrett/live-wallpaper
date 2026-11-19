@@ -103,4 +103,33 @@ public sealed class FlowFieldTests
         Assert.Equal((0f, 12f), At(image, 120, 200));
         Assert.Equal((0f, -12f), At(image, 280, 200));
     }
+
+    public static TheoryData<string> Polygons => new() { "concave", "star" };
+
+    [Theory]
+    [MemberData(nameof(Polygons))]
+    public void FlowField_ScanlineMatchesContainsPoint(string shape)
+    {
+        RegionPoint[] points = shape == "concave"
+            ? [new(0.1, 0.1), new(0.5, 0.2), new(0.9, 0.1), new(0.7, 0.5), new(0.9, 0.9), new(0.4, 0.6), new(0.1, 0.8)]
+            : Enumerable.Range(0, 64).Select(i =>
+            {
+                var angle = i * 2 * Math.PI / 64;
+                var radius = i % 2 == 0 ? 0.45 : 0.18;
+                return new RegionPoint(0.5 + (radius * Math.Cos(angle)), 0.5 + (radius * Math.Sin(angle)));
+            }).ToArray();
+        var set = new RegionSet([new Region(points) { Flow = new RegionPoint(0, 0.12) }]);
+
+        var image = FlowField.Build(set, Bounds, Target, 0);
+
+        for (var y = 0; y < image.Height; y++)
+        {
+            for (var x = 0; x < image.Width; x++)
+            {
+                var centre = new RegionPoint((((x + 0.5) * FlowField.Downscale) - Bounds.X) / Bounds.Width, (((y + 0.5) * FlowField.Downscale) - Bounds.Y) / Bounds.Height);
+                var expected = RegionGeometry.ContainsPoint(points, centre);
+                Assert.Equal(expected, image.Pixels[((y * image.Width) + x) * 2 + 1] != 0);
+            }
+        }
+    }
 }

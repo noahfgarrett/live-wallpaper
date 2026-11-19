@@ -39,9 +39,10 @@ public static class FlowField
 
         var distance = new float[width * height];
         Array.Fill(distance, float.PositiveInfinity);
+        var crossings = new List<double>();
         foreach (var region in water.Regions)
         {
-            Paint(region, imageBounds, width, height, pixels, distance);
+            Paint(region, imageBounds, width, height, pixels, distance, crossings);
         }
 
         var reachCells = (float)(dilatePx / Downscale);
@@ -60,7 +61,7 @@ public static class FlowField
         return image;
     }
 
-    private static void Paint(Region region, RectangleF bounds, int width, int height, float[] pixels, float[] distance)
+    private static void Paint(Region region, RectangleF bounds, int width, int height, float[] pixels, float[] distance, List<double> crossings)
     {
         if (region.Flow is not { } flow || region.Points.Count < 3)
         {
@@ -77,21 +78,43 @@ public static class FlowField
         var top = Math.Max(0, (int)Math.Floor((((minY * bounds.Height) + bounds.Y) / Downscale) - 1));
         var bottom = Math.Min(height - 1, (int)Math.Ceiling((((maxY * bounds.Height) + bounds.Y) / Downscale) + 1));
 
+        var points = region.Points;
         for (var y = top; y <= bottom; y++)
         {
             var ny = (((y + 0.5) * Downscale) - bounds.Y) / bounds.Height;
+            crossings.Clear();
+            for (int i = 0, j = points.Count - 1; i < points.Count; j = i++)
+            {
+                var a = points[i];
+                var b = points[j];
+                if ((a.Y > ny) != (b.Y > ny))
+                {
+                    crossings.Add(((b.X - a.X) * (ny - a.Y) / (b.Y - a.Y)) + a.X);
+                }
+            }
+            if (crossings.Count == 0)
+            {
+                continue;
+            }
+            crossings.Sort();
+
+            // Even-odd, matching RegionGeometry.ContainsPoint: a pixel is inside when an odd number of crossings lie at or left of it.
+            var next = 0;
             for (var x = left; x <= right; x++)
             {
                 var nx = (((x + 0.5) * Downscale) - bounds.X) / bounds.Width;
-                if (nx < minX || nx > maxX || ny < minY || ny > maxY
-                    || !RegionGeometry.ContainsPoint(region.Points, new RegionPoint(nx, ny)))
+                while (next < crossings.Count && crossings[next] <= nx)
+                {
+                    next++;
+                }
+                if ((next & 1) == 0)
                 {
                     continue;
                 }
-                var i = (y * width) + x;
-                pixels[2 * i] = (float)vx;
-                pixels[(2 * i) + 1] = (float)vy;
-                distance[i] = 0;
+                var index = (y * width) + x;
+                pixels[2 * index] = (float)vx;
+                pixels[(2 * index) + 1] = (float)vy;
+                distance[index] = 0;
             }
         }
     }

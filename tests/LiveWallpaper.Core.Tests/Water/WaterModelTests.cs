@@ -104,6 +104,20 @@ public sealed class WaterModelTests
     }
 
     [Fact]
+    public void PhaseClock_NonFiniteInputs_DoNotPoisonThePhase()
+    {
+        var clock = new WaterPhaseClock();
+        var before = clock.Step(0.3, 50);
+
+        Assert.Equal(before, clock.Step(double.NaN, 50));
+        Assert.Equal(before, clock.Step(double.PositiveInfinity, 50));
+        var after = clock.Step(0.1, double.NaN);
+
+        Assert.Equal(before + (0.1 / WaterModel.CycleSeconds(0)), after, 9);
+        Assert.True(clock.Step(0.1, double.PositiveInfinity) is >= 0 and < 1);
+    }
+
+    [Fact]
     public void FrameConstants_SizeIsAMultipleOf16()
     {
         Assert.Equal(0, Marshal.SizeOf<WaterFrameConstants>() % 16);
