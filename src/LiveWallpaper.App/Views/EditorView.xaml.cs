@@ -77,6 +77,14 @@ public partial class EditorView : UserControl
         Preview.PixelSizeChanged += (_, _) => ShowCamera(_camera.Resize(Preview.PixelSize), force: true);
         Preview.ZoomRequested += (_, e) => ShowCamera(_camera.ZoomAt(e.ViewPoint, e.Factor));
         Preview.PanRequested += (_, e) => ShowCamera(_camera.Pan(e.Delta));
+        // Focus leaves the editor when the window deactivates, so a swallowed Space's release may never arrive here.
+        IsKeyboardFocusWithinChanged += (_, e) =>
+        {
+            if (e.NewValue is false)
+            {
+                _isSpaceSwallowed = false;
+            }
+        };
         ApplyPanel.Closed += (_, _) =>
         {
             Overlay.Visibility = Visibility.Collapsed;
@@ -512,6 +520,11 @@ public partial class EditorView : UserControl
             _isSpaceSwallowed = true;
             e.Handled = true;
             return;
+        }
+        if (e.Key == Key.Space && !e.IsRepeat)
+        {
+            // A fresh Space press off the preview: any earlier swallowed press has ended, wherever its release went.
+            _isSpaceSwallowed = false;
         }
         var modifiers = Keyboard.Modifiers;
         if (e.Key is Key.Delete or Key.Back && modifiers == ModifierKeys.None)
