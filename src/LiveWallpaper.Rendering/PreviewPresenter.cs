@@ -56,8 +56,18 @@ public sealed class PreviewPresenter : IDisposable
             return _targetView;
         }
         ReleaseTarget();
-        var desc = new Texture2DDescription(Format.B8G8R8A8_UNorm, (uint)render.Width, (uint)render.Height, 0, 1,
-            BindFlags.RenderTarget | BindFlags.ShaderResource, ResourceUsage.Default, CpuAccessFlags.None, 1, 0, ResourceOptionFlags.GenerateMips);
+        var desc = new Texture2DDescription(
+            format: Format.B8G8R8A8_UNorm,
+            width: (uint)render.Width,
+            height: (uint)render.Height,
+            arraySize: 1,
+            mipLevels: 0,
+            bindFlags: BindFlags.RenderTarget | BindFlags.ShaderResource,
+            usage: ResourceUsage.Default,
+            cpuAccessFlags: CpuAccessFlags.None,
+            sampleCount: 1,
+            sampleQuality: 0,
+            miscFlags: ResourceOptionFlags.GenerateMips);
         var texture = _gpu.Device.CreateTexture2D(desc);
         try
         {
