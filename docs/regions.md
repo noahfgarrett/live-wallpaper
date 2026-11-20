@@ -62,6 +62,12 @@ In the **Regions** panel (Snow and Rain; Glass and Water differ as described bel
 - **Snow everywhere except the regions** (on the Rain tab, **Rain everywhere except the regions**), **Soft edge** and **Show outlines** do what they say. **Show outlines** is shared by all tabs.
 - **Undo**/**Redo** (Ctrl+Z, Ctrl+Y or Ctrl+Shift+Z) go back up to 99 steps, one per completed drag. Each effect has its own history, and the keys act on the open tab.
 - Switching tabs commits a pending soft-edge change and ends a drag in progress on the tab being left.
+- **Zoom and pan** let you place corners and arrows precisely:
+  - Zoom with the mouse wheel (the point under the cursor stays put), the zoom bar under the preview (**−**, the percentage, **+** and **Fit**), or Ctrl+= and Ctrl+− to step, Ctrl+1 for 100 % and Ctrl+0 for Fit. The percentage is measured against desktop pixels, so 100 % is one screen pixel per desktop pixel.
+  - The range runs from Fit to 400 %. (On a display larger than 4K, 100 % is one screen pixel per pixel of the preview, which is rendered at most 3840 × 2160.)
+  - Pan by dragging with the middle button, dragging with the right button (a right-click without a drag still removes a corner), or holding Space and dragging with the left button. The picture can't be dragged past its edges.
+  - Handles, outlines and arrows keep their on-screen size at every zoom, and drags are limited to the part of the image visible in the zoomed view.
+  - The zoom returns to Fit when the editor opens and when the image or the scaling changes. It isn't saved.
 - The preview shows the photo as your primary display will, scaled down. Under Center scaling it crops at the display's size, not the preview's, so the part you can edit is the part the desktop shows.
 - Changes show in the preview right away, are saved half a second after you stop, and go to the desktop live when the image is applied.
 
