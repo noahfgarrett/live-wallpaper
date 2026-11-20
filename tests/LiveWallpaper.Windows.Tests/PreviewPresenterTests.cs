@@ -76,6 +76,22 @@ public sealed class PreviewPresenterTests
     }
 
     [Fact]
+    public void Present_AtFit_0_7_CheckerboardBecomesGrey()
+    {
+        WindowsOnly.Require();
+
+        AssertCheckerboardIsGreyAtFit(new Size(1434, 1434));
+    }
+
+    [Fact]
+    public void Present_AtFit_0_35_CheckerboardBecomesGrey()
+    {
+        WindowsOnly.Require();
+
+        AssertCheckerboardIsGreyAtFit(new Size(717, 717));
+    }
+
+    [Fact]
     public void Present_OutsideRender_IsBackground()
     {
         WindowsOnly.Require();
@@ -163,6 +179,22 @@ public sealed class PreviewPresenterTests
 
         Assert.Throws<InvalidOperationException>(() =>
             presenter.Present(offscreen, render, PreviewCamera.Fit(render, render)));
+    }
+
+    /// <summary>A 1-px checker in a 2048 x 2048 render, shown at Fit in <paramref name="view"/>, must average to grey with no beat pattern.</summary>
+    private static void AssertCheckerboardIsGreyAtFit(Size view)
+    {
+        var render = new Size(2048, 2048);
+
+        var pixels = PresentAndReadBack(render, view, Checkerboard(render), PreviewCamera.Fit(render, view));
+
+        for (var i = 0; i < pixels.Length; i += 4)
+        {
+            for (var channel = 0; channel < 3; channel++)
+            {
+                Assert.InRange(pixels[i + channel], 100, 155);
+            }
+        }
     }
 
     private static byte[] PresentAndReadBack(Size render, Size view, byte[] source, PreviewCamera camera)

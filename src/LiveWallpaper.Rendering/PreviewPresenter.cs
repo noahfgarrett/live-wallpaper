@@ -11,7 +11,7 @@ namespace LiveWallpaper.Rendering;
 
 /// <summary>
 /// Holds the editor preview's desktop-sized offscreen target and shows the camera's view of it, sharp at every zoom:
-/// Catmull-Rom from the mip that leaves at most a 2x reduction.
+/// Catmull-Rom from the mip that leaves at most a 2x reduction, widened by that reduction so fine detail is averaged, not aliased.
 /// </summary>
 public sealed class PreviewPresenter : IDisposable
 {
@@ -120,7 +120,10 @@ public sealed class PreviewPresenter : IDisposable
 
         var context = _gpu.Context;
         context.OMSetRenderTargets(target);
-        context.GenerateMips(_shaderView);
+        if (_constants.Mip > 0)
+        {
+            context.GenerateMips(_shaderView);
+        }
         context.UpdateSubresource(in _constants, _constantBuffer);
         context.ClearRenderTargetView(target, s_background);
         context.OMSetBlendState(_opaque);
