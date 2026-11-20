@@ -59,15 +59,24 @@
                                 </Border>
                                 <StackPanel Margin="14,12,14,14">
                                     <TextBlock FontWeight="SemiBold" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
-                                    <StackPanel Margin="0,6,0,0" Orientation="Horizontal">
-                                        <Border Margin="0,0,6,0" Padding="8,2" CornerRadius="9" Background="#2A3B55" Visibility="{Binding SnowBadge}">
+                                    <WrapPanel Margin="0,6,0,0">
+                                        <Border Margin="0,0,6,6" Padding="8,2" CornerRadius="9" Background="#2A3B55" Visibility="{Binding SnowBadge}">
                                             <TextBlock FontSize="11" Foreground="{StaticResource IceBrush}" Text="Snow" />
                                         </Border>
-                                        <Border Padding="8,2" CornerRadius="9" Background="#24402A" Visibility="{Binding DesktopBadge}">
+                                        <Border Margin="0,0,6,6" Padding="8,2" CornerRadius="9" Background="#2D3A44" Visibility="{Binding RainBadge}">
+                                            <TextBlock FontSize="11" Foreground="#B4C8D6" Text="Rain" />
+                                        </Border>
+                                        <Border Margin="0,0,6,6" Padding="8,2" CornerRadius="9" Background="#352F52" Visibility="{Binding GlassBadge}">
+                                            <TextBlock FontSize="11" Foreground="#C9BEFF" Text="Glass" />
+                                        </Border>
+                                        <Border Margin="0,0,6,6" Padding="8,2" CornerRadius="9" Background="#173F4A" Visibility="{Binding WaterBadge}">
+                                            <TextBlock FontSize="11" Foreground="#80D8EA" Text="Water" />
+                                        </Border>
+                                        <Border Margin="0,0,6,6" Padding="8,2" CornerRadius="9" Background="#24402A" Visibility="{Binding DesktopBadge}">
                                             <TextBlock FontSize="11" Foreground="#9BE08F" Text="On desktop" />
                                         </Border>
-                                    </StackPanel>
-                                    <StackPanel Margin="0,12,0,0" Orientation="Horizontal">
+                                    </WrapPanel>
+                                    <StackPanel Margin="0,6,0,0" Orientation="Horizontal">
                                         <ui:Button Appearance="Primary" Click="OnApplyCard" Content="Apply" Icon="{ui:SymbolIcon Desktop24}" Margin="0,0,6,0" />
                                         <ui:Button Click="OnEditCard" Content="Edit" Icon="{ui:SymbolIcon Edit24}" Margin="0,0,6,0" />
                                         <ui:Button Click="OnRemoveCard" Icon="{ui:SymbolIcon Delete24}" ToolTip="Remove from library" />

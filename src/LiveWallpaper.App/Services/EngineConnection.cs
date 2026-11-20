@@ -17,6 +17,7 @@ public sealed class EngineConnection(EngineClient client, string engineExePath)
     private static readonly TimeSpan s_requestTimeout = TimeSpan.FromMilliseconds(800);
     private static readonly TimeSpan s_startBudget = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan s_takeoverBudget = TimeSpan.FromSeconds(8);
+    private static readonly TimeSpan s_outdatedShutdownBudget = TimeSpan.FromSeconds(3);
     private const int StartPollMs = 200;
 
     public string EngineExePath => engineExePath;
@@ -31,22 +32,27 @@ public sealed class EngineConnection(EngineClient client, string engineExePath)
     };
 
     /// <summary>
-    /// Starts the engine unless one already answers. An engine process that doesn't answer (an older build, or a stuck one)
-    /// doesn't stop the launch: the new engine replaces it, which takes longer.
+    /// Starts the engine unless a current one already answers. An engine that answers with an older protocol is asked to shut down first.
+    /// An engine process that doesn't answer (an older build, or a stuck one) doesn't stop the launch: the new engine replaces it, which takes longer.
     /// </summary>
     public async Task<EngineStart> EnsureRunningAsync(CancellationToken ct)
     {
-        if (await PingAsync(ct).ConfigureAwait(false))
+        var status = await TryGetStatusAsync(ct).ConfigureAwait(false);
+        if (status is not null && !EngineProtocol.NeedsReplacement(status))
         {
             return EngineStart.Running;
         }
-        var watch = Stopwatch.StartNew();
-        var otherEngineRunning = IsEngineProcessRunning();
         if (!File.Exists(engineExePath))
         {
             Log.Error("app", "event=engine-missing");
             return EngineStart.CouldNotStart;
         }
+        if (status is not null)
+        {
+            await ShutDownOutdatedEngineAsync(ct).ConfigureAwait(false);
+        }
+        var watch = Stopwatch.StartNew();
+        var otherEngineRunning = IsEngineProcessRunning();
         try
         {
             using var _ = Process.Start(new ProcessStartInfo(engineExePath) { UseShellExecute = false });
@@ -61,12 +67,22 @@ public sealed class EngineConnection(EngineClient client, string engineExePath)
             Log.Info("app", "event=engine-not-answering action=start-replacement");
         }
         var budget = otherEngineRunning ? s_takeoverBudget : s_startBudget;
+        var hasLoggedOutdated = false;
         while (watch.Elapsed < budget)
         {
             await Task.Delay(StartPollMs, ct).ConfigureAwait(false);
-            if (await PingAsync(ct).ConfigureAwait(false))
+            if (await TryGetStatusAsync(ct).ConfigureAwait(false) is not { } started)
+            {
+                continue;
+            }
+            if (!EngineProtocol.NeedsReplacement(started))
             {
                 return EngineStart.Running;
+            }
+            if (!hasLoggedOutdated)
+            {
+                Log.Info("app", "event=engine-outdated action=ignored");
+                hasLoggedOutdated = true;
             }
         }
         return otherEngineRunning ? EngineStart.OlderEngineInTheWay : EngineStart.CouldNotStart;
@@ -87,6 +103,25 @@ public sealed class EngineConnection(EngineClient client, string engineExePath)
         return processes.Length > 0;
     }
 
-    private async Task<bool> PingAsync(CancellationToken ct) =>
-        await client.SendAsync(new GetStatus(), s_pingTimeout, ct).ConfigureAwait(false) is StatusReport;
+    /// <summary>
+    /// Asks an outdated engine to exit and waits a little for its pipe to close. A failed send may mean it is already
+    /// shutting down, so the wait runs either way; an engine that ignores the request is left to the takeover path.
+    /// </summary>
+    private async Task ShutDownOutdatedEngineAsync(CancellationToken ct)
+    {
+        Log.Info("app", "event=engine-outdated action=replace");
+        await client.SendAsync(new Shutdown(), s_requestTimeout, ct).ConfigureAwait(false);
+        var watch = Stopwatch.StartNew();
+        while (watch.Elapsed < s_outdatedShutdownBudget)
+        {
+            await Task.Delay(StartPollMs, ct).ConfigureAwait(false);
+            if (await TryGetStatusAsync(ct).ConfigureAwait(false) is null)
+            {
+                return;
+            }
+        }
+    }
+
+    private async Task<EngineStatus?> TryGetStatusAsync(CancellationToken ct) =>
+        await client.SendAsync(new GetStatus(), s_pingTimeout, ct).ConfigureAwait(false) is StatusReport report ? report.Status : null;
 }

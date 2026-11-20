@@ -1,3 +1,4 @@
+using System.Drawing;
 using System.Runtime.InteropServices;
 using LiveWallpaper.Windows.Interop;
 
@@ -57,6 +58,22 @@ public sealed unsafe class PreviewChildWindow : IDisposable
     public void CaptureMouse() => User32.SetCapture(Handle);
 
     public static void ReleaseMouse() => User32.ReleaseCapture();
+
+    /// <summary>Converts a point in screen pixels to this window's client pixels; null if the window is gone.</summary>
+    public Point? ScreenToClient(Point screen)
+    {
+        var point = new POINT { X = screen.X, Y = screen.Y };
+        return User32.ScreenToClient(Handle, ref point) ? new Point(point.X, point.Y) : null;
+    }
+
+    /// <summary>Whether this window is what's under <paramref name="screen"/>, in screen pixels: shown, and not covered by a popup.</summary>
+    public bool IsUnder(Point screen) => User32.WindowFromPoint(new POINT { X = screen.X, Y = screen.Y }) == Handle;
+
+    /// <summary>Whether this window is what's under the mouse cursor.</summary>
+    public bool IsUnderCursor() => User32.GetCursorPos(out var cursor) && IsUnder(new Point(cursor.X, cursor.Y));
+
+    /// <summary>Whether Space was held when the message being handled was sent.</summary>
+    public static bool IsSpaceDown() => User32.GetKeyState(User32.VK_SPACE) < 0;
 
     public void Dispose()
     {

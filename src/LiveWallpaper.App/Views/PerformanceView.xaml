@@ -20,7 +20,7 @@
                     <StackPanel><TextBlock Style="{StaticResource HelpText}" Text="Engine CPU" /><ui:TextBlock x:Name="Cpu" FontTypography="Subtitle" Text="–" /></StackPanel>
                 </ui:Card>
                 <ui:Card>
-                    <StackPanel><TextBlock Style="{StaticResource HelpText}" Text="Snowflakes" /><ui:TextBlock x:Name="Particles" FontTypography="Subtitle" Text="–" /></StackPanel>
+                    <StackPanel><TextBlock Style="{StaticResource HelpText}" Text="Particles" /><ui:TextBlock x:Name="Particles" FontTypography="Subtitle" Text="–" /></StackPanel>
                 </ui:Card>
             </UniformGrid>
 

@@ -10,8 +10,8 @@ public sealed class RegionOverlayRenderer : IDisposable
 {
     public const string ShaderResource = "RegionOverlay.hlsl";
 
-    /// <summary>Must match MAX_SHAPES in the shader. Enough for every edge of the largest region set plus one region's handles and the ghost.</summary>
-    public const int MaxShapes = 1100;
+    /// <summary>Must match MAX_SHAPES in the shader. Enough for every edge of the largest region set, one region's handles and the ghost, and in Flow mode every arrow plus the selected arrowhead.</summary>
+    public const int MaxShapes = 1120;
 
     private const int HeaderFloats = 4;
     private const int FloatsPerShape = 8;

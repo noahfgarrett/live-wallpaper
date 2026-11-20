@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace LiveWallpaper.Core.Regions;
 
 /// <summary>A 2D point. Regions store it in normalized image coordinates (0–1); the geometry helpers also use it for screen pixels.</summary>
@@ -18,8 +20,12 @@ public readonly record struct NormalizedRect(double Left, double Top, double Rig
 /// <summary>A polygon in normalized image coordinates.</summary>
 public sealed record Region(IReadOnlyList<RegionPoint> Points)
 {
-    /// <summary>Exactly four corners: a plane that future effects may map into with a homography.</summary>
+    /// <summary>Exactly four corners, the shape of a glass pane. Informational only: glass pane rules use the point count directly.</summary>
     public bool IsPlane => Points.Count == 4;
+
+    /// <summary>Water only: the direction and strength of the flow, in normalized image coordinates.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public RegionPoint? Flow { get; init; }
 
     public bool Equals(Region? other)
     {
@@ -31,12 +37,13 @@ public sealed record Region(IReadOnlyList<RegionPoint> Points)
         {
             return false;
         }
-        return Points.SequenceEqual(other.Points);
+        return Flow == other.Flow && Points.SequenceEqual(other.Points);
     }
 
     public override int GetHashCode()
     {
         var hash = new HashCode();
+        hash.Add(Flow);
         foreach (var point in Points ?? [])
         {
             hash.Add(point);

@@ -102,7 +102,9 @@ public sealed class LibraryStore(string libraryDirectory, TimeProvider timeProvi
             var document = JsonSerializer.Deserialize(stream, CoreJsonContext.Default.LibraryDocument)
                 ?? throw new JsonException("Library file contained null.");
             Validate(document);
-            return document.Items;
+            var repaired = Repair(document);
+            ValidateEffects(repaired);
+            return repaired.Items;
         }
         catch (JsonException)
         {
@@ -146,6 +148,15 @@ public sealed class LibraryStore(string libraryDirectory, TimeProvider timeProvi
         }
     }
 
+    private static LibraryDocument Repair(LibraryDocument document) =>
+        document with { Items = document.Items.Select(RepairItem).ToList() };
+
+    private static LibraryItem RepairItem(LibraryItem item) => item with
+    {
+        Glass = item.Glass with { Regions = EffectRules.Repair(EffectKind.Glass, item.Glass.Regions) },
+        Water = item.Water with { Regions = EffectRules.Repair(EffectKind.Water, item.Water.Regions) },
+    };
+
     private static void Validate(LibraryDocument document)
     {
         if (document.SchemaVersion != LibraryDocument.CurrentSchemaVersion || document.Items is null)
@@ -162,7 +173,32 @@ public sealed class LibraryStore(string libraryDirectory, TimeProvider timeProvi
                 || item.Snow is null
                 || !item.Snow.IsValid
                 || item.Regions is null
-                || !item.Regions.IsValid)
+                || !item.Regions.IsValid
+                || item.Rain?.Settings is null
+                || !item.Rain.Settings.IsValid
+                || item.Rain.Regions is null
+                || !item.Rain.Regions.IsValid
+                || item.Glass?.Settings is null
+                || !item.Glass.Settings.IsValid
+                || item.Glass.Regions is null
+                || !item.Glass.Regions.IsValid
+                || item.Water?.Settings is null
+                || !item.Water.Settings.IsValid
+                || item.Water.Regions is null
+                || !item.Water.Regions.IsValid)
+            {
+                throw new JsonException("The library contains an invalid item.");
+            }
+        }
+    }
+
+    private static void ValidateEffects(LibraryDocument document)
+    {
+        foreach (var item in document.Items)
+        {
+            if (!EffectRules.IsValid(EffectKind.Rain, item.Rain.Regions)
+                || !EffectRules.IsValid(EffectKind.Glass, item.Glass.Regions)
+                || !EffectRules.IsValid(EffectKind.Water, item.Water.Regions))
             {
                 throw new JsonException("The library contains an invalid item.");
             }

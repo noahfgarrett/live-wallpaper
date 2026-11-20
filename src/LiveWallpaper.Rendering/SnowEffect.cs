@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Runtime.InteropServices;
 using LiveWallpaper.Core.Models;
+using LiveWallpaper.Core.Regions;
 using LiveWallpaper.Core.Snow;
 using Vortice.Direct3D;
 using Vortice.Direct3D11;
@@ -52,7 +53,7 @@ public sealed unsafe class SnowEffect : IEffect
         }
     }
 
-    public string Id => "snow";
+    public EffectKind Kind => EffectKind.Snow;
 
     public int ActiveParticles => _count;
 
@@ -65,7 +66,13 @@ public sealed unsafe class SnowEffect : IEffect
         }
     }
 
+    public bool NeedsFrameCopy => false;
+
     public void Apply(SnowSettings settings) => Volatile.Write(ref _settings, settings);
+
+    public void SetGeometry(RegionSet regions, RectangleF imageBounds, Size targetPixels)
+    {
+    }
 
     public void Update(in FrameTime time, Size targetPixels)
     {
@@ -77,7 +84,7 @@ public sealed unsafe class SnowEffect : IEffect
         _constants.FlakeCount = _count;
     }
 
-    public void Render(ID3D11RenderTargetView target, Size targetPixels, ID3D11ShaderResourceView mask)
+    public void Render(ID3D11RenderTargetView target, Size targetPixels, in EffectInputs inputs)
     {
         if (_count == 0 || !Volatile.Read(ref _settings).Enabled)
         {
@@ -96,7 +103,7 @@ public sealed unsafe class SnowEffect : IEffect
         context.PSSetShader(_pixelShader);
         context.PSSetConstantBuffer(0, _frameBuffer);
         context.PSSetShaderResource(0, _atlas);
-        context.PSSetShaderResource(1, mask);
+        context.PSSetShaderResource(1, inputs.Mask);
         context.PSSetSampler(0, _sampler);
         context.DrawInstanced(4, (uint)_count, 0, 0);
     }

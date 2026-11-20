@@ -2,11 +2,11 @@
 
 [![CI](https://github.com/noahfgarrett/live-wallpaper/actions/workflows/ci.yml/badge.svg)](https://github.com/noahfgarrett/live-wallpaper/actions/workflows/ci.yml)
 
-Live Wallpaper is a native Windows 10/11 app that turns a still photo into a living desktop wallpaper. Import a photo and add real-time snow in the editor, watching a live preview as you go. Then apply it, and the snow keeps falling behind your desktop icons. It's drawn with Direct3D 11 and costs little while it runs.
+Live Wallpaper is a native Windows 10/11 app that turns a still photo into a living desktop wallpaper. Import a photo and add real-time snow, rain, rain on a window or flowing water in the editor, watching a live preview as you go. Then apply it, and the effects keep running behind your desktop icons. It's drawn with Direct3D 11 and costs little while it runs.
 
 ## Status
 
-**Early test builds (Milestone 4).** The app, live snow, effect regions, tray icon and settings are built. Automatic pausing comes next. Nothing is verified on a real desktop yet; see [the test checklist](docs/windows-test-checklist.md).
+**Early test builds (Milestone 5).** The app, live snow, rain, rain on glass, flowing water, effect regions, tray icon and settings are built. Automatic pausing comes next. Nothing is verified on a real desktop yet; see [the test checklist](docs/windows-test-checklist.md).
 
 ### Verified on Windows
 
@@ -20,12 +20,16 @@ Nothing yet. Each behaviour is listed here only after it has been checked on a r
 ## Using it
 
 - **Library:** choose **Import images**, or drop photos onto the window. Each image is copied into the library; your original file is never changed or deleted.
-- **Edit:** opens the editor with a live preview. Turn snow on, then adjust density, speed, wind, flake size and motion blur. If the image is on your desktop, it changes there too.
-- **Regions:** in the editor, **Add region** and drag its corners onto part of the photo, such as the sky, so snow falls only there. Turn on **Snow everywhere except the regions** to keep snow off a window instead, and use **Soft edge** to blend the border. See [docs/regions.md](docs/regions.md).
+- **Edit:** opens the editor with a live preview and a tab per effect. Every effect you turn on runs at once, and if the image is on your desktop, it changes there too.
+  - **Snow:** density, speed, wind, flake size and motion blur.
+  - **Rain:** falling streaks in depth layers that slant with the wind. Density, speed, wind, streak length and brightness.
+  - **Glass:** rain on a window. Drops sit on the glass, slide down it leaving trails, and show an upside-down view of the scene behind them. Drops, drop size, sliding and fog.
+  - **Water:** makes the photo's own waterfall or river flow. Stretch, foam, and mist that softens the base of a waterfall.
+- **Regions:** each effect has its own. **Add region** and drag its corners onto part of the photo, such as the sky, so snow or rain falls only there. Turn on **Snow everywhere except the regions** to keep snow off a window instead, and use **Soft edge** to blend the border. On the Glass tab, **Add pane** and drag its four corners onto a window, so the drops follow its perspective. On the Water tab, add a region on the water and drag its arrow the way the water flows; a longer arrow flows faster. See [docs/regions.md](docs/regions.md).
 - **Apply:** pick all displays or one, and a scaling mode (Fill, Fit, Stretch, Center).
 - **Tray icon:** right-click it to open the app, pause or resume the animation, switch to a recent wallpaper, open settings, or exit.
 - **Settings:** start with Windows (off by default), keep the wallpaper running when the app is closed, frame rate (30, 60 or Adaptive) and default scaling.
-- **Performance:** live frame rate, memory, CPU and snowflake count from the wallpaper engine.
+- **Performance:** live frame rate, memory, CPU and particle count (snowflakes plus rain streaks) from the wallpaper engine.
 
 The wallpaper itself is drawn by a small background program, `LiveWallpaper.Engine.exe`, which keeps running in the tray after you close the app. Settings and the library live in `%LOCALAPPDATA%\LiveWallpaper\`, and logs in `%LOCALAPPDATA%\LiveWallpaper\logs\`.
 
@@ -56,6 +60,7 @@ The solution, WPF app included, also builds on macOS and Linux (`EnableWindowsTa
 
 - **Engine:** one window per monitor behind the desktop icons, attached to Explorer's window tree. The tree changed in Windows 11 24H2; both layouts are handled, and the engine refuses to attach rather than ever covering your icons. See [docs/desktop-integration.md](docs/desktop-integration.md).
 - **Snow:** stateless GPU particles, with every flake's position computed in the vertex shader. It's built to stay smooth over days of uptime. See [docs/snow-model.md](docs/snow-model.md).
+- **Rain, glass and water:** stateless too. Rain streaks are GPU particles like snow, glass drops are drawn per pixel in each pane's perspective over a copy of the frame, and water redraws the photo shifted along its arrows. They follow the same rules for days of uptime. See [docs/effects-model.md](docs/effects-model.md).
 - **App:** talks to the engine over a named pipe that only your user account can open.
 
 ## Known limitations

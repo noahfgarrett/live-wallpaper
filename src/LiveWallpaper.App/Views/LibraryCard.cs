@@ -20,6 +20,13 @@ public sealed class LibraryCard(LibraryItem item, string thumbnailPath) : INotif
 
     public Visibility SnowBadge => Item.Snow.Enabled && Item.Snow.DensityPct > 0 ? Visibility.Visible : Visibility.Collapsed;
 
+    public Visibility RainBadge => Item.Rain.Settings.Enabled && Item.Rain.Settings.DensityPct > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+    public Visibility GlassBadge => Item.Glass.Settings.Enabled ? Visibility.Visible : Visibility.Collapsed;
+
+    /// <summary>Water only moves inside its regions, so without any it shows nothing.</summary>
+    public Visibility WaterBadge => Item.Water.Settings.Enabled && Item.Water.Regions.Regions.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+
     public Visibility DesktopBadge => _isOnDesktop ? Visibility.Visible : Visibility.Collapsed;
 
     public bool IsOnDesktop

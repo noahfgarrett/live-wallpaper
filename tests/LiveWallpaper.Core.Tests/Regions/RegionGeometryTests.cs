@@ -140,4 +140,24 @@ public sealed class RegionGeometryTests
         Assert.Equal(a.GetHashCode(), b.GetHashCode());
         Assert.NotEqual(a, moved);
     }
+
+    private static readonly RegionPoint Arrow = new(0.1, -0.2);
+
+    private static Region Flowing() => new([new(0.1, 0.1), new(0.5, 0.1), new(0.5, 0.5), new(0.1, 0.5)]) { Flow = Arrow };
+
+    [Fact]
+    public void MoveVertex_KeepsFlow() =>
+        Assert.Equal(Arrow, RegionGeometry.MoveVertex(Flowing(), 0, new RegionPoint(0.2, 0.2), NormalizedRect.Unit).Flow);
+
+    [Fact]
+    public void Translate_KeepsFlow() =>
+        Assert.Equal(Arrow, RegionGeometry.Translate(Flowing(), 0.1, 0.1, NormalizedRect.Unit).Flow);
+
+    [Fact]
+    public void InsertVertex_KeepsFlow() =>
+        Assert.Equal(Arrow, RegionGeometry.InsertVertex(Flowing(), 0, new RegionPoint(0.3, 0.1)).Flow);
+
+    [Fact]
+    public void RemoveVertex_KeepsFlow() =>
+        Assert.Equal(Arrow, RegionGeometry.RemoveVertex(Flowing(), 0).Flow);
 }

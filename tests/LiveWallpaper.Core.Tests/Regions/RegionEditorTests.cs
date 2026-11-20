@@ -1,5 +1,7 @@
 using System.Drawing;
+using LiveWallpaper.Core.Models;
 using LiveWallpaper.Core.Regions;
+using LiveWallpaper.Core.Water;
 
 namespace LiveWallpaper.Core.Tests.Regions;
 
@@ -10,9 +12,9 @@ public sealed class RegionEditorTests
     // A 2000x1000 image shown with Center scaling on a 1000x1000 view: only x 0.25–0.75 is visible.
     private static readonly RegionView CroppedView = new(new RectangleF(-500, 0, 2000, 1000), new Size(1000, 1000), 1);
 
-    private static RegionEditor EditorWithQuad(RegionView? view = null)
+    private static RegionEditor EditorWithQuad(RegionView? view = null, RegionEditMode mode = RegionEditMode.Free)
     {
-        var editor = new RegionEditor(RegionSet.Empty);
+        var editor = new RegionEditor(RegionSet.Empty, mode);
         editor.SetView(view ?? FullView);
         editor.AddRegion();
         return editor;
@@ -299,5 +301,260 @@ public sealed class RegionEditorTests
         editor.SetView(FullView);
 
         Assert.Equal(1, raised);
+    }
+
+    [Fact]
+    public void Plane_EdgeClick_DoesNotAddCorner()
+    {
+        var editor = EditorWithQuad(mode: RegionEditMode.Plane);
+
+        editor.PointerMove(new(500, 352));
+        Assert.Equal(0, Count(editor, OverlayShapeKind.Ghost));
+        Drag(editor, new(500, 352), new RegionPoint(500, 300));
+
+        Assert.Equal(4, editor.State.Regions[0].Points.Count);
+    }
+
+    [Fact]
+    public void Plane_RightClick_DoesNotRemoveCorner()
+    {
+        var editor = EditorWithQuad(mode: RegionEditMode.Plane);
+
+        editor.RemoveVertexAt(new(350, 350));
+        Assert.Equal(4, editor.State.Regions[0].Points.Count);
+        Drag(editor, new(350, 350));
+        Assert.Equal(0, editor.SelectedVertex);
+        Assert.False(editor.DeleteSelectedVertex());
+
+        Assert.Equal(4, editor.State.Regions[0].Points.Count);
+    }
+
+    [Fact]
+    public void Plane_SetInvert_IsIgnored()
+    {
+        var editor = EditorWithQuad(mode: RegionEditMode.Plane);
+
+        editor.SetInvert(true);
+
+        Assert.False(editor.State.Invert);
+        editor.Undo();
+        Assert.Empty(editor.State.Regions);
+    }
+
+    [Fact]
+    public void Flow_SetInvert_IsIgnored()
+    {
+        var editor = EditorWithQuad(mode: RegionEditMode.Flow);
+
+        editor.SetInvert(true);
+
+        Assert.False(editor.State.Invert);
+    }
+
+    [Fact]
+    public void Flow_AddRegion_HasDefaultArrow()
+    {
+        var editor = EditorWithQuad(mode: RegionEditMode.Flow);
+
+        Assert.Equal(EffectRules.DefaultFlow, editor.State.Regions[0].Flow);
+    }
+
+    [Fact]
+    public void Free_AddRegion_HasNoArrow()
+    {
+        var editor = EditorWithQuad();
+
+        Assert.Null(editor.State.Regions[0].Flow);
+    }
+
+    [Fact]
+    public void Flow_DragArrowHead_SetsFlow()
+    {
+        var editor = EditorWithQuad(mode: RegionEditMode.Flow);
+
+        // Centroid (0.5, 0.5) plus the default flow puts the head at (500, 620).
+        Drag(editor, new(500, 620), new RegionPoint(700, 500));
+
+        AssertPoint(new RegionPoint(0.2, 0), editor.State.Regions[0].Flow ?? default);
+        AssertPoint(new RegionPoint(0.35, 0.35), editor.State.Regions[0].Points[0]);
+    }
+
+    [Fact]
+    public void Flow_DragArrowHead_CorrectsForImageAspect()
+    {
+        var editor = new RegionEditor(RegionSet.Empty, RegionEditMode.Flow, imageAspect: 2);
+        editor.SetView(FullView);
+        editor.AddRegion();
+
+        // 0.4 image widths is 0.8 image heights on a 2:1 image, so it clamps to MaxArrow (0.5 heights = 0.25 widths).
+        Drag(editor, new(500, 620), new RegionPoint(900, 500));
+
+        AssertPoint(new RegionPoint(WaterModel.MaxArrow / 2, 0), editor.State.Regions[0].Flow ?? default);
+    }
+
+    [Fact]
+    public void Flow_DragArrowOntoCentre_ClampsToMinimum()
+    {
+        var editor = EditorWithQuad(mode: RegionEditMode.Flow);
+
+        Drag(editor, new(500, 620), new RegionPoint(505, 500));
+
+        AssertPoint(new RegionPoint(WaterModel.MinArrow, 0), editor.State.Regions[0].Flow ?? default);
+    }
+
+    [Fact]
+    public void Flow_EdgeToEdgeDragOnTallImage_GivesValidFlow()
+    {
+        // A thin strip on the left edge, centroid (0.01, 0.4). On a 0.45 image the drag to the right edge is under MaxArrow
+        // after aspect correction, but longer than one image width.
+        var strip = new Region([new(0, 0.3), new(0.02, 0.3), new(0.02, 0.5), new(0, 0.5)]) { Flow = EffectRules.DefaultFlow };
+        var editor = new RegionEditor(new RegionSet([strip]), RegionEditMode.Flow, imageAspect: 0.45);
+        editor.SetView(FullView);
+        Drag(editor, new(10, 400));
+
+        Drag(editor, new(10, 520), new RegionPoint(1000, 620));
+
+        Assert.True(EffectRules.IsValidFlow(editor.State.Regions[0].Flow));
+    }
+
+    [Fact]
+    public void Flow_ShortestHorizontalArrowOnWideImage_GivesValidFlow()
+    {
+        var editor = new RegionEditor(RegionSet.Empty, RegionEditMode.Flow, imageAspect: 12);
+        editor.SetView(FullView);
+        editor.AddRegion();
+
+        Drag(editor, new(500, 620), new RegionPoint(501, 500));
+
+        var flow = editor.State.Regions[0].Flow ?? default;
+        Assert.True(EffectRules.IsValidFlow(flow));
+        Assert.True(flow.X > 0);
+        Assert.Equal(0, flow.Y, 9);
+    }
+
+    [Fact]
+    public void Flow_ArrowDrag_StaysOnVisibleImage()
+    {
+        var editor = EditorWithQuad(CroppedView, RegionEditMode.Flow);
+
+        // Centroid (0.5, 0.5); the head starts at image (0.5, 0.62), screen (500, 620). Screen x 1100 is image x 0.8, past the visible 0.75.
+        Drag(editor, new(500, 620), new RegionPoint(1100, 620));
+
+        var flow = editor.State.Regions[0].Flow ?? default;
+        AssertPoint(new RegionPoint(0.75, 0.62), new RegionPoint(0.5 + flow.X, 0.5 + flow.Y));
+    }
+
+    [Fact]
+    public void Flow_HeadOnCorner_DragsArrow()
+    {
+        var corner = new RegionPoint(0.35, 0.35);
+        var region = RegionGeometry.CreateQuad() with { Flow = new RegionPoint(-0.15, -0.15) };
+        var editor = new RegionEditor(new RegionSet([region]), RegionEditMode.Flow);
+        editor.SetView(FullView);
+        Drag(editor, new(500, 500));
+
+        Drag(editor, new(350, 350), new RegionPoint(300, 500));
+
+        AssertPoint(corner, editor.State.Regions[0].Points[0]);
+        AssertPoint(new RegionPoint(-0.2, 0), editor.State.Regions[0].Flow ?? default);
+    }
+
+    [Fact]
+    public void Flow_ArrowDrag_IsOneUndoStep()
+    {
+        var editor = EditorWithQuad(mode: RegionEditMode.Flow);
+        var afterAdd = editor.State;
+
+        Drag(editor, new(500, 620), Enumerable.Range(1, 10).Select(i => new RegionPoint(500 + (i * 10), 620)).ToArray());
+        AssertPoint(new RegionPoint(0.1, 0.12), editor.State.Regions[0].Flow ?? default);
+        editor.Undo();
+
+        Assert.Equal(afterAdd, editor.State);
+        editor.Undo();
+        Assert.Empty(editor.State.Regions);
+    }
+
+    [Fact]
+    public void Flow_UndoDuringArrowDrag_CancelsIt()
+    {
+        var editor = EditorWithQuad(mode: RegionEditMode.Flow);
+        var afterAdd = editor.State;
+
+        editor.PointerDown(new(500, 620));
+        editor.PointerMove(new(700, 500));
+        AssertPoint(new RegionPoint(0.2, 0), editor.State.Regions[0].Flow ?? default);
+        editor.Undo();
+        editor.PointerMove(new(800, 500));
+        editor.PointerUp();
+
+        Assert.Equal(afterAdd, editor.State);
+    }
+
+    [Fact]
+    public void Flow_MovingRegion_KeepsArrow()
+    {
+        var editor = EditorWithQuad(mode: RegionEditMode.Flow);
+
+        Drag(editor, new(500, 500), new RegionPoint(600, 500));
+
+        AssertPoint(new RegionPoint(0.45, 0.35), editor.State.Regions[0].Points[0]);
+        Assert.Equal(EffectRules.DefaultFlow, editor.State.Regions[0].Flow);
+    }
+
+    [Fact]
+    public void Flow_Overlay_ShowsArrowForEveryRegion_HandleOnlyForSelected()
+    {
+        var editor = EditorWithQuad(mode: RegionEditMode.Flow);
+        editor.AddRegion();
+
+        var shapes = editor.Overlay();
+
+        var arrows = shapes.Where(s => s.Kind == OverlayShapeKind.Arrow).ToArray();
+        Assert.Equal(2, arrows.Length);
+        AssertPoint(new RegionPoint(0.5, 0.5), arrows[0].A);
+        AssertPoint(new RegionPoint(0.5, 0.62), arrows[0].B);
+        var handle = Assert.Single(shapes, s => s.Kind == OverlayShapeKind.ArrowHandle);
+        AssertPoint(new RegionPoint(0.5, 0.62), handle.A);
+        Assert.Equal(handle.A, handle.B);
+        Drag(editor, new(100, 100));
+        Assert.Equal(2, Count(editor, OverlayShapeKind.Arrow));
+        Assert.Equal(0, Count(editor, OverlayShapeKind.ArrowHandle));
+    }
+
+    [Fact]
+    public void Flow_RegionWithoutFlow_DrawsDefaultArrow()
+    {
+        var editor = new RegionEditor(new RegionSet([RegionGeometry.CreateQuad()]), RegionEditMode.Flow);
+        editor.SetView(FullView);
+
+        var arrow = Assert.Single(editor.Overlay(), s => s.Kind == OverlayShapeKind.Arrow);
+
+        AssertPoint(new RegionPoint(0.5, 0.62), arrow.B);
+    }
+
+    [Fact]
+    public void Free_Overlay_HasNoArrows()
+    {
+        var region = RegionGeometry.CreateQuad() with { Flow = EffectRules.DefaultFlow };
+        var editor = new RegionEditor(new RegionSet([region]));
+        editor.SetView(FullView);
+        Drag(editor, new(500, 500));
+
+        Assert.Equal(0, Count(editor, OverlayShapeKind.Arrow));
+        Assert.Equal(0, Count(editor, OverlayShapeKind.ArrowHandle));
+    }
+
+    [Fact]
+    public void Constructor_RejectsInvalidAspect()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new RegionEditor(RegionSet.Empty, RegionEditMode.Flow, 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new RegionEditor(RegionSet.Empty, RegionEditMode.Flow, double.NaN));
+    }
+
+    [Fact]
+    public void Mode_IsKept()
+    {
+        Assert.Equal(RegionEditMode.Plane, new RegionEditor(RegionSet.Empty, RegionEditMode.Plane).Mode);
+        Assert.Equal(RegionEditMode.Free, new RegionEditor(RegionSet.Empty).Mode);
     }
 }
