@@ -36,6 +36,28 @@ public sealed class PreviewPresenterTests
     }
 
     [Fact]
+    public void Present_AtHalfPixelOffset_AveragesNeighbouringTexels()
+    {
+        WindowsOnly.Require();
+        var render = new Size(512, 512);
+        var view = new Size(128, 64);
+        var source = HorizontalRamp(render);
+        var camera = new PreviewCamera(render, view, 1.0, new PointF(100.5f, 50));
+
+        var pixels = PresentAndReadBack(render, view, source, camera);
+
+        for (var y = 0; y < view.Height; y++)
+        {
+            for (var x = 0; x < view.Width; x++)
+            {
+                var left = ((y + 50) * render.Width + x + 100) * 4;
+                var average = (source[left] + source[left + 4]) / 2.0;
+                Assert.InRange(pixels[(y * view.Width + x) * 4], average - 1, average + 1);
+            }
+        }
+    }
+
+    [Fact]
     public void Present_AtFit_CheckerboardBecomesGrey()
     {
         WindowsOnly.Require();
@@ -130,6 +152,19 @@ public sealed class PreviewPresenterTests
             presenter.Present(target.View, target.Size, PreviewCamera.Fit(new Size(16, 16), target.Size)));
     }
 
+    [Fact]
+    public void Present_IntoItsOwnTarget_Throws()
+    {
+        WindowsOnly.Require();
+        using var gpu = GpuDevice.Create(useWarp: true);
+        using var presenter = new PreviewPresenter(gpu);
+        var render = new Size(64, 64);
+        var offscreen = presenter.Begin(render);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            presenter.Present(offscreen, render, PreviewCamera.Fit(render, render)));
+    }
+
     private static byte[] PresentAndReadBack(Size render, Size view, byte[] source, PreviewCamera camera)
     {
         using var gpu = GpuDevice.Create(useWarp: true);
@@ -157,6 +192,24 @@ public sealed class PreviewPresenterTests
                 pixels[i] = (byte)(x & 255);
                 pixels[i + 1] = (byte)(y & 255);
                 pixels[i + 2] = (byte)(((x >> 8) * 128) + ((y >> 8) * 64));
+                pixels[i + 3] = 255;
+            }
+        }
+        return pixels;
+    }
+
+    /// <summary>Blue rises by one per column from 90 at x = 100, staying linear across the columns the half-pixel test reads.</summary>
+    private static byte[] HorizontalRamp(Size size)
+    {
+        var pixels = new byte[size.Width * size.Height * 4];
+        for (var y = 0; y < size.Height; y++)
+        {
+            for (var x = 0; x < size.Width; x++)
+            {
+                var i = (y * size.Width + x) * 4;
+                pixels[i] = (byte)Math.Clamp(x - 10, 0, 255);
+                pixels[i + 1] = 128;
+                pixels[i + 2] = 64;
                 pixels[i + 3] = 255;
             }
         }

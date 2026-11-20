@@ -95,6 +95,10 @@ public sealed class PreviewPresenter : IDisposable
         {
             throw new InvalidOperationException("Begin must be called before Present.");
         }
+        if (ReferenceEquals(target, _targetView))
+        {
+            throw new InvalidOperationException("The preview cannot be presented into its own offscreen target.");
+        }
         if (camera.Render != _size)
         {
             throw new ArgumentException($"The camera's render size {camera.Render} does not match the target's {_size}.", nameof(camera));

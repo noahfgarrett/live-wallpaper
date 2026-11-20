@@ -11,6 +11,7 @@ public sealed record PreviewCamera(Size Render, Size View, double Scale, PointF 
     private const int MaxRenderHeight = 2160;
     private const double FitTolerance = 1e-6;
     private const double ActualScale = 1.0;
+    private const double ActualTolerance = 1e-9;
 
     public Size Render { get; init; } = Positive(Render);
 
@@ -110,12 +111,21 @@ public sealed record PreviewCamera(Size Render, Size View, double Scale, PointF 
     private static PreviewCamera Create(Size render, Size view, double scale, PointF offset)
     {
         var camera = new PreviewCamera(render, view, scale, offset);
-        return camera with
+        var x = ClampAxis(offset.X, camera.Render.Width, camera.View.Width, scale);
+        var y = ClampAxis(offset.Y, camera.Render.Height, camera.View.Height, scale);
+        if (Math.Abs(scale - ActualScale) < ActualTolerance)
         {
-            Offset = new PointF(
-                ClampAxis(offset.X, camera.Render.Width, camera.View.Width, scale),
-                ClampAxis(offset.Y, camera.Render.Height, camera.View.Height, scale)),
-        };
+            x = SnapAxis(x, camera.Render.Width, camera.View.Width);
+            y = SnapAxis(y, camera.Render.Height, camera.View.Height);
+        }
+        return camera with { Offset = new PointF(x, y) };
+    }
+
+    /// <summary>At 100 % a whole-pixel offset puts every view pixel on a render pixel, so nothing is resampled.</summary>
+    private static float SnapAxis(float offset, int render, int view)
+    {
+        var snapped = MathF.Round(offset);
+        return view > render ? snapped : Math.Clamp(snapped, 0, render - view);
     }
 
     private static float ClampAxis(float offset, int render, int view, double scale)

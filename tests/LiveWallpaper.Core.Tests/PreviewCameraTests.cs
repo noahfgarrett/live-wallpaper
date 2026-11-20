@@ -141,6 +141,27 @@ public sealed class PreviewCameraTests
         Assert.Equal(centre.Y, after.Y, 2);
     }
 
+    [Theory]
+    [InlineData(960, 540)]
+    [InlineData(961, 541)]
+    public void ToActual_HasWholePixelOffset(int viewWidth, int viewHeight)
+    {
+        var view = new Size(viewWidth, viewHeight);
+        var camera = PreviewCamera.Fit(Render, view).ZoomAt(new PointF(333, 201), 1.7).ToActual();
+
+        Assert.Equal(1.0, camera.Scale, 9);
+        AssertWholePixelsInRange(camera);
+    }
+
+    [Fact]
+    public void ZoomAtToActual_HasWholePixelOffset()
+    {
+        var camera = PreviewCamera.Fit(Render, View).ZoomAt(new PointF(333.3f, 201.7f), 2);
+
+        Assert.Equal(1.0, camera.Scale, 9);
+        AssertWholePixelsInRange(camera);
+    }
+
     [Fact]
     public void Resize_AtFit_StaysFit()
     {
@@ -187,5 +208,13 @@ public sealed class PreviewCameraTests
         var camera = PreviewCamera.Fit(new Size(3840, 2160), new Size(1920, 1080));
         Assert.Equal(50, camera.ZoomPercent);
         Assert.Equal(100, camera.ToActual().ZoomPercent);
+    }
+
+    private static void AssertWholePixelsInRange(PreviewCamera camera)
+    {
+        Assert.Equal(Math.Round(camera.Offset.X), camera.Offset.X);
+        Assert.Equal(Math.Round(camera.Offset.Y), camera.Offset.Y);
+        Assert.InRange(camera.Offset.X, 0, camera.Render.Width - camera.View.Width);
+        Assert.InRange(camera.Offset.Y, 0, camera.Render.Height - camera.View.Height);
     }
 }
