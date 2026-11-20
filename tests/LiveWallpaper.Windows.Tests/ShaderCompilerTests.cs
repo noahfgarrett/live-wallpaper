@@ -44,6 +44,16 @@ public sealed class ShaderCompilerTests
         Assert.False(ShaderCompiler.Compile(GlassEffect.ShaderResource, entryPoint, profile).IsEmpty);
     }
 
+    [Theory]
+    [InlineData("VSMain", "vs_5_0")]
+    [InlineData("PSMain", "ps_5_0")]
+    public void PreviewBlit_Compiles(string entryPoint, string profile)
+    {
+        WindowsOnly.Require();
+
+        Assert.False(ShaderCompiler.Compile(PreviewPresenter.ShaderResource, entryPoint, profile).IsEmpty);
+    }
+
     [Fact]
     public void Compile_MissingResource_Throws()
     {
