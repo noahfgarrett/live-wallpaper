@@ -37,7 +37,7 @@ public sealed class PreviewCameraTests
     {
         var fit = PreviewCamera.Fit(Render, View);
         Assert.True(fit.CanZoomIn);
-        Assert.False(fit.ZoomAt(new PointF(480, 270), 100).CanZoomIn);
+        Assert.False(fit.ToActual().ZoomAt(new PointF(480, 270), 100).CanZoomIn);
     }
 
     [Fact]
@@ -67,8 +67,27 @@ public sealed class PreviewCameraTests
     public void ZoomAt_ClampsToFitAndTo400()
     {
         var camera = PreviewCamera.Fit(Render, View);
-        Assert.Equal(4.0, camera.ZoomAt(new PointF(10, 10), 100).Scale, 9);
+        Assert.Equal(4.0, camera.ToActual().ZoomAt(new PointF(10, 10), 100).Scale, 9);
         Assert.Equal(0.5, camera.ZoomAt(new PointF(10, 10), 0.1).Scale, 9);
+    }
+
+    [Fact]
+    public void ZoomAt_CrossingActual_SnapsTo100()
+    {
+        var cursor = new PointF(333.3f, 201.7f);
+        var camera = PreviewCamera.Fit(Render, View);
+        var scales = new List<double>();
+        for (var i = 0; i < 5; i++)
+        {
+            camera = camera.ZoomAt(cursor, PreviewCamera.StepFactor);
+            scales.Add(camera.Scale);
+        }
+
+        Assert.Equal(new[] { 0.625, 0.78125, 0.9765625, 1.0, 1.25 }, scales.ToArray());
+        var down = camera.ZoomAt(cursor, 0.5);
+        Assert.Equal(1.0, down.Scale);
+        Assert.Equal(Math.Round(down.Offset.X), down.Offset.X);
+        Assert.Equal(Math.Round(down.Offset.Y), down.Offset.Y);
     }
 
     [Fact]
@@ -137,7 +156,7 @@ public sealed class PreviewCameraTests
         Assert.Equal(0.5, camera.Scale, 9);
         Assert.True(camera.IsFit);
 
-        var fromAbove = PreviewCamera.Fit(Render, View).ZoomAt(PointF.Empty, 3);
+        var fromAbove = PreviewCamera.Fit(Render, View).ToActual().ZoomAt(PointF.Empty, 1.5);
         Assert.Equal(1.5, fromAbove.Scale, 9);
         Assert.Equal(1.2, fromAbove.StepOut().Scale, 9);
         Assert.Equal(1.0, fromAbove.StepOut().StepOut().Scale, 9);

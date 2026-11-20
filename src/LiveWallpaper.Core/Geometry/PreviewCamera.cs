@@ -42,7 +42,16 @@ public sealed record PreviewCamera(Size Render, Size View, double Scale, PointF 
             Math.Max(1, (int)Math.Round(size.Height * shrink)));
     }
 
-    public PreviewCamera ZoomAt(PointF viewPoint, double factor) => WithScaleAround(viewPoint, Scale * factor);
+    /// <summary>Zooms by <paramref name="factor"/> around <paramref name="viewPoint"/>, stopping at 100 % when the zoom crosses it.</summary>
+    public PreviewCamera ZoomAt(PointF viewPoint, double factor)
+    {
+        var next = Scale * factor;
+        if ((Scale < ActualScale && next > ActualScale) || (Scale > ActualScale && next < ActualScale))
+        {
+            next = ActualScale;
+        }
+        return WithScaleAround(viewPoint, next);
+    }
 
     public PreviewCamera Pan(SizeF viewDelta) =>
         Create(Render, View, Scale, new PointF(Offset.X - (float)(viewDelta.Width / Scale), Offset.Y - (float)(viewDelta.Height / Scale)));

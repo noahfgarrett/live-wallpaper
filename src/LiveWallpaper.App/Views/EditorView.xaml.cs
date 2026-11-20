@@ -77,6 +77,8 @@ public partial class EditorView : UserControl
         Preview.PixelSizeChanged += (_, _) => ShowCamera(_camera.Resize(Preview.PixelSize), force: true);
         Preview.ZoomRequested += (_, e) => ShowCamera(_camera.ZoomAt(e.ViewPoint, e.Factor));
         Preview.PanRequested += (_, e) => ShowCamera(_camera.Pan(e.Delta));
+        // Focus the editor on open so the Ctrl zoom shortcuts work before anything is clicked.
+        Loaded += (_, _) => Focus();
         // Focus leaves the editor when the window deactivates, so a swallowed Space's release may never arrive here.
         IsKeyboardFocusWithinChanged += (_, e) =>
         {
@@ -541,7 +543,7 @@ public partial class EditorView : UserControl
             OnRedo(sender, e);
             e.Handled = true;
         }
-        else if (modifiers == ModifierKeys.Control && ZoomFor(e.Key) is { } zoom)
+        else if (IsZoomShortcut(e.Key, modifiers) && ZoomFor(e.Key) is { } zoom)
         {
             ShowCamera(zoom);
             e.Handled = true;
@@ -556,6 +558,11 @@ public partial class EditorView : UserControl
             e.Handled = true;
         }
     }
+
+    /// <summary>Ctrl with a zoom key; Ctrl+Shift+= also counts, because that is how Ctrl++ is typed.</summary>
+    private static bool IsZoomShortcut(Key key, ModifierKeys modifiers) =>
+        modifiers == ModifierKeys.Control
+        || (modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && key is Key.OemPlus or Key.Add);
 
     /// <summary>The camera a Ctrl+key zoom shortcut asks for, or null if the key isn't one.</summary>
     private PreviewCamera? ZoomFor(Key key) => key switch
