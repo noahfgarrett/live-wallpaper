@@ -66,6 +66,13 @@
             <Setter Property="Fill" Value="{DynamicResource AccentFillColorDefaultBrush}" />
             <Setter Property="Visibility" Value="Collapsed" />
         </Style>
+        <!-- Not focusable, so Space held for panning never presses the zoom button last clicked. -->
+        <Style x:Key="ZoomBarButton" BasedOn="{StaticResource {x:Type ui:Button}}" TargetType="ui:Button">
+            <Setter Property="Appearance" Value="Transparent" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+            <Setter Property="Focusable" Value="False" />
+        </Style>
     </UserControl.Resources>
     <Grid>
         <Grid.ColumnDefinitions>
@@ -83,9 +90,17 @@
                 <ui:TextBlock x:Name="Heading" VerticalAlignment="Center" FontTypography="Title" TextTrimming="CharacterEllipsis" />
             </StackPanel>
             <Grid x:Name="PreviewArea" Grid.Row="1" SizeChanged="OnPreviewAreaSizeChanged">
-                <Border x:Name="PreviewFrame" HorizontalAlignment="Center" VerticalAlignment="Top" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-                    <preview:PreviewHost x:Name="Preview" />
-                </Border>
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Top">
+                    <Border x:Name="PreviewFrame" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                        <preview:PreviewHost x:Name="Preview" />
+                    </Border>
+                    <StackPanel x:Name="ZoomBar" Height="32" Margin="0,8,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
+                        <ui:Button x:Name="ZoomOutButton" AutomationProperties.Name="Zoom out" Click="OnZoomOut" Icon="{ui:SymbolIcon ZoomOut24}" Style="{StaticResource ZoomBarButton}" ToolTip="Zoom out (Ctrl+−)" />
+                        <TextBlock x:Name="ZoomText" MinWidth="48" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextAlignment="Center" ToolTip="Ctrl+1 for 100 %" />
+                        <ui:Button x:Name="ZoomInButton" AutomationProperties.Name="Zoom in" Click="OnZoomIn" Icon="{ui:SymbolIcon ZoomIn24}" Style="{StaticResource ZoomBarButton}" ToolTip="Zoom in (Ctrl+=)" />
+                        <ui:Button x:Name="FitButton" Margin="4,0,0,0" Click="OnZoomFit" Content="Fit" Icon="{ui:SymbolIcon ZoomFit24}" Style="{StaticResource ZoomBarButton}" ToolTip="Fit (Ctrl+0)" />
+                    </StackPanel>
+                </StackPanel>
             </Grid>
         </Grid>
 

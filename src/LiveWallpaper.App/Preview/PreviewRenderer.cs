@@ -13,7 +13,6 @@ namespace LiveWallpaper.App.Preview;
 
 public sealed class PreviewRenderer : IDisposable
 {
-    private const int ResizeSettleMs = 150;
     private const int IdleSleepMs = 60;
     private const int OccludedSleepMs = 120;
     private const uint Seed = 20261119;
@@ -23,7 +22,6 @@ public sealed class PreviewRenderer : IDisposable
     private readonly Lock _gate = new();
     private volatile bool _stop;
     private Size _size;
-    private long _sizeChangedAt;
     private (string Path, WallpaperScaling Scaling, Size Reference)? _image;
     private int _imageVersion;
     private SnowSettings _snow = new();
@@ -36,6 +34,7 @@ public sealed class PreviewRenderer : IDisposable
     private RegionSet _waterRegions = RegionSet.Empty;
     private OverlayFrame _overlay = new([], 1f);
     private volatile bool _thirtyFps;
+    private PreviewCamera? _camera;
 
     public PreviewRenderer(nint window, Size size)
     {
@@ -49,17 +48,13 @@ public sealed class PreviewRenderer : IDisposable
     {
         lock (_gate)
         {
-            if (size != _size)
-            {
-                _size = size;
-                _sizeChangedAt = Stopwatch.GetTimestamp();
-            }
+            _size = size;
         }
     }
 
     /// <param name="path">The image file.</param>
     /// <param name="scaling">How it is scaled.</param>
-    /// <param name="reference">The monitor the preview stands for. Center scaling crops at its size, so the preview shows what the desktop will.</param>
+    /// <param name="reference">The monitor the preview stands for. The scene is built at its resolution (<see cref="PreviewCamera.RenderSizeFor"/>), as the desktop builds it.</param>
     public void SetImage(string path, WallpaperScaling scaling, Size reference)
     {
         lock (_gate)
@@ -104,6 +99,13 @@ public sealed class PreviewRenderer : IDisposable
 
     public void SetFrameRate(FrameRateMode mode) => _thirtyFps = mode == FrameRateMode.Fps30;
 
+    /// <summary>Which part of the desktop-sized scene the preview shows. Until one for the current image arrives, the preview fits.</summary>
+    public void SetCamera(PreviewCamera camera)
+    {
+        ArgumentNullException.ThrowIfNull(camera);
+        Volatile.Write(ref _camera, camera);
+    }
+
     public void Dispose()
     {
         _stop = true;
@@ -117,11 +119,14 @@ public sealed class PreviewRenderer : IDisposable
             using var gpu = CreateGpu();
             using var background = new ImageQuadRenderer(gpu);
             using var overlay = new RegionOverlayRenderer(gpu);
+            using var presenter = new PreviewPresenter(gpu);
             WallpaperSurface? surface = null;
             WallpaperScene? scene = null;
             SceneEffects? effects = null;
             var builtVersion = -1;
-            var builtSize = Size.Empty;
+            var render = Size.Empty;
+            PreviewCamera? requested = null;
+            PreviewCamera? camera = null;
             var clock = Stopwatch.StartNew();
             var last = 0.0;
             try
@@ -129,13 +134,11 @@ public sealed class PreviewRenderer : IDisposable
                 while (!_stop)
                 {
                     Size size;
-                    long changedAt;
                     (string Path, WallpaperScaling Scaling, Size Reference)? image;
                     int version;
                     lock (_gate)
                     {
                         size = _size;
-                        changedAt = _sizeChangedAt;
                         image = _image;
                         version = _imageVersion;
                     }
@@ -154,22 +157,21 @@ public sealed class PreviewRenderer : IDisposable
                         surface.Resize(size);
                     }
 
-                    var settled = Stopwatch.GetElapsedTime(changedAt).TotalMilliseconds >= ResizeSettleMs;
-                    if (image is { } wanted && (version != builtVersion || (builtSize != size && settled)))
+                    if (image is { } wanted && version != builtVersion)
                     {
                         scene?.Dispose();
                         scene = null;
                         effects = null;
+                        render = PreviewCamera.RenderSizeFor(wanted.Reference);
                         try
                         {
-                            (scene, effects) = BuildScene(gpu, background, wanted.Path, wanted.Scaling, wanted.Reference, size);
+                            (scene, effects) = BuildScene(gpu, background, wanted.Path, wanted.Scaling, render);
                         }
                         catch (Exception ex) when (ex is not OutOfMemoryException)
                         {
                             Log.Error("preview", "event=scene-failed", ex);
                         }
                         builtVersion = version;
-                        builtSize = size;
                     }
 
                     var now = clock.Elapsed.TotalSeconds;
@@ -177,6 +179,12 @@ public sealed class PreviewRenderer : IDisposable
                     last = now;
                     if (scene is not null && effects is not null)
                     {
+                        var latest = Volatile.Read(ref _camera);
+                        if (camera is null || !ReferenceEquals(latest, requested) || camera.Render != render || camera.View != size)
+                        {
+                            requested = latest;
+                            camera = CameraFor(latest, render, size);
+                        }
                         effects.Snow.Apply(Volatile.Read(ref _snow));
                         effects.Rain.Apply(Volatile.Read(ref _rain));
                         effects.Glass.Apply(Volatile.Read(ref _glass));
@@ -185,10 +193,11 @@ public sealed class PreviewRenderer : IDisposable
                         scene.SetRegions(EffectKind.Rain, Volatile.Read(ref _rainRegions));
                         scene.SetRegions(EffectKind.Glass, Volatile.Read(ref _glassRegions));
                         scene.SetRegions(EffectKind.Water, Volatile.Read(ref _waterRegions));
-                        scene.Update(new FrameTime(dt, now), size);
-                        scene.Render(surface.BackBuffer, size);
+                        scene.Update(new FrameTime(dt, now), render);
+                        scene.Render(presenter.Begin(render), render);
+                        presenter.Present(surface.BackBuffer, size, camera);
                         var frame = Volatile.Read(ref _overlay);
-                        overlay.Draw(surface.BackBuffer, size, scene.ImageBounds, frame.Shapes, frame.Scale);
+                        overlay.Draw(surface.BackBuffer, size, camera.MapRect(scene.ImageBounds), frame.Shapes, frame.Scale);
                     }
                     else
                     {
@@ -212,19 +221,28 @@ public sealed class PreviewRenderer : IDisposable
         }
     }
 
-    /// <summary>Builds the scene as the reference monitor would show it, scaled down to the preview.</summary>
-    private static (WallpaperScene Scene, SceneEffects Effects) BuildScene(GpuDevice gpu, ImageQuadRenderer background, string path, WallpaperScaling scaling, Size reference, Size target)
+    /// <summary>
+    /// The camera to draw this frame with: the editor's, kept to the swap chain's size if the editor hasn't caught up with a
+    /// resize yet, or Fit while there is none for this render size.
+    /// </summary>
+    private static PreviewCamera CameraFor(PreviewCamera? requested, Size render, Size view)
+    {
+        if (requested is null || requested.Render != render)
+        {
+            return PreviewCamera.Fit(render, view);
+        }
+        return requested.View == view ? requested : requested.Resize(view);
+    }
+
+    /// <summary>Builds the scene for a monitor of <paramref name="render"/> pixels, exactly as the engine builds it.</summary>
+    private static (WallpaperScene Scene, SceneEffects Effects) BuildScene(GpuDevice gpu, ImageQuadRenderer background, string path, WallpaperScaling scaling, Size render)
     {
         var imageSize = WicImageLoader.ReadSize(path);
-        var crop = ScalingMath.ComputeSourceCrop(imageSize, reference, scaling);
-        var onReference = ScalingMath.ComputeDecodeSize(imageSize, reference, scaling);
-        var decodeSize = new Size(
-            Math.Clamp((int)Math.Ceiling(onReference.Width * (double)target.Width / reference.Width), 1, crop.Width),
-            Math.Clamp((int)Math.Ceiling(onReference.Height * (double)target.Height / reference.Height), 1, crop.Height));
-        var decoded = WicImageLoader.Load(path, crop, decodeSize);
+        var crop = ScalingMath.ComputeSourceCrop(imageSize, render, scaling);
+        var decoded = WicImageLoader.Load(path, crop, ScalingMath.ComputeDecodeSize(imageSize, render, scaling));
         var scene = new WallpaperScene(gpu, background, gpu.CreateImageTexture(decoded),
-            ScalingMath.ComputeScaledDestination(crop.Size, reference, target, scaling),
-            ScalingMath.ComputeScaledDestination(imageSize, reference, target, scaling));
+            ScalingMath.ComputeDestination(crop.Size, render, scaling),
+            ScalingMath.ComputeDestination(imageSize, render, scaling));
         try
         {
             var snow = new SnowEffect(gpu, Seed);

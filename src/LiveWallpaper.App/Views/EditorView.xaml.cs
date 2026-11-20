@@ -33,6 +33,8 @@ public partial class EditorView : UserControl
     private readonly Dictionary<EffectKind, RegionEditor> _editors = [];
     private readonly double _aspect;
     private readonly System.Drawing.Size _monitorSize;
+    private readonly System.Drawing.Size _renderSize;
+    private PreviewCamera _camera;
     private LibraryItem _item;
     private EffectKind _activeTab = EffectKind.Snow;
     private bool _loading = true;
@@ -50,6 +52,9 @@ public partial class EditorView : UserControl
             ? new System.Drawing.Size(1920, 1080)
             : primary.Bounds.Size;
         _aspect = _monitorSize.Width / (double)_monitorSize.Height;
+        // The preview draws the desktop at its own resolution; the camera picks the part of it on screen.
+        _renderSize = PreviewCamera.RenderSizeFor(_monitorSize);
+        _camera = PreviewCamera.Fit(_renderSize, Preview.PixelSize);
         _liveSnow = new UpdateCoalescer<SnowSettings>(snow => _engine.SendAsync(new UpdateSnow(_item.Id, snow), CancellationToken.None), LiveUpdateInterval);
         _liveRain = new UpdateCoalescer<RainSettings>(rain => _engine.SendAsync(new UpdateRain(_item.Id, rain), CancellationToken.None), LiveUpdateInterval);
         _liveGlass = new UpdateCoalescer<GlassSettings>(glass => _engine.SendAsync(new UpdateGlass(_item.Id, glass), CancellationToken.None), LiveUpdateInterval);
@@ -68,7 +73,14 @@ public partial class EditorView : UserControl
         }
         _featherCommit.Tick += (_, _) => CommitFeather();
         Preview.PointerInput += OnPreviewPointer;
-        Preview.PixelSizeChanged += (_, _) => UpdateRegionView();
+        Preview.PixelSizeChanged += (_, _) => ShowCamera(_camera.Resize(Preview.PixelSize), force: true);
+        Preview.ZoomRequested += (_, e) => ShowCamera(_camera.ZoomAt(e.ViewPoint, e.Factor));
+        Preview.PanRequested += (_, e) =>
+        {
+            // As a click on the preview does; it also keeps a Space held for panning from pressing a focused switch or button.
+            Focus();
+            ShowCamera(_camera.Pan(e.Delta));
+        };
         ApplyPanel.Closed += (_, _) =>
         {
             Overlay.Visibility = Visibility.Collapsed;
@@ -116,7 +128,7 @@ public partial class EditorView : UserControl
         UpdateLabels();
         UpdateTabDots();
         ShowTabLayout();
-        UpdateRegionView();
+        ShowCamera(_camera, force: true);
         SyncRegionControls();
     }
 
@@ -316,7 +328,7 @@ public partial class EditorView : UserControl
         if (!_loading)
         {
             Preview.SetImage(_library.ImagePath(_item), SelectedScaling(), _monitorSize);
-            UpdateRegionView();
+            ShowCamera(_camera.ToFit(), force: true);
         }
     }
 
@@ -328,14 +340,37 @@ public partial class EditorView : UserControl
 
     private double DpiScale => VisualTreeHelper.GetDpi(this).DpiScaleX;
 
+    /// <summary>Makes <paramref name="camera"/> the preview's view and updates everything that depends on it; does nothing if it hasn't changed, unless forced.</summary>
+    private void ShowCamera(PreviewCamera camera, bool force = false)
+    {
+        if (!force && camera == _camera)
+        {
+            return;
+        }
+        _camera = camera;
+        Preview.SetCamera(camera);
+        ZoomText.Text = $"{camera.ZoomPercent} %";
+        ZoomOutButton.IsEnabled = !camera.IsFit;
+        ZoomInButton.IsEnabled = camera.Scale < Math.Max(PreviewCamera.MaxScale, camera.FitScale) - 1e-6;
+        FitButton.IsEnabled = !camera.IsFit;
+        UpdateRegionView();
+    }
+
+    private void OnZoomOut(object sender, RoutedEventArgs e) => ShowCamera(_camera.StepOut());
+
+    private void OnZoomIn(object sender, RoutedEventArgs e) => ShowCamera(_camera.StepIn());
+
+    private void OnZoomFit(object sender, RoutedEventArgs e) => ShowCamera(_camera.ToFit());
+
     private void UpdateRegionView()
     {
         var pixels = Preview.PixelSize;
         RegionView? view = null;
         if (pixels.Width >= 2 && pixels.Height >= 2 && _item.PixelWidth > 0 && _item.PixelHeight > 0)
         {
-            var imageBounds = ScalingMath.ComputeScaledDestination(new System.Drawing.Size(_item.PixelWidth, _item.PixelHeight), _monitorSize, pixels, SelectedScaling());
-            view = new RegionView(imageBounds, pixels, DpiScale);
+            // Where the whole image lands on the desktop-sized scene, then where the camera shows that.
+            var imageBoundsOnRender = ScalingMath.ComputeDestination(new System.Drawing.Size(_item.PixelWidth, _item.PixelHeight), _renderSize, SelectedScaling());
+            view = new RegionView(_camera.MapRect(imageBoundsOnRender), pixels, DpiScale);
         }
         foreach (var editor in _editors.Values)
         {
@@ -488,15 +523,31 @@ public partial class EditorView : UserControl
             OnRedo(sender, e);
             e.Handled = true;
         }
+        else if (modifiers == ModifierKeys.Control && ZoomFor(e.Key) is { } zoom)
+        {
+            ShowCamera(zoom);
+            e.Handled = true;
+        }
     }
+
+    /// <summary>The camera a Ctrl+key zoom shortcut asks for, or null if the key isn't one.</summary>
+    private PreviewCamera? ZoomFor(Key key) => key switch
+    {
+        Key.D0 or Key.NumPad0 => _camera.ToFit(),
+        Key.D1 or Key.NumPad1 => _camera.ToActual(),
+        Key.OemPlus or Key.Add => _camera.StepIn(),
+        Key.OemMinus or Key.Subtract => _camera.StepOut(),
+        _ => null,
+    };
 
     private void OnPreviewAreaSizeChanged(object sender, SizeChangedEventArgs e)
     {
+        var available = Math.Max(0, PreviewArea.ActualHeight - (ZoomBar.Height + ZoomBar.Margin.Top + ZoomBar.Margin.Bottom));
         var width = PreviewArea.ActualWidth;
         var height = width / _aspect;
-        if (height > PreviewArea.ActualHeight)
+        if (height > available)
         {
-            height = PreviewArea.ActualHeight;
+            height = available;
             width = height * _aspect;
         }
         Preview.Width = Math.Max(1, width - 2);

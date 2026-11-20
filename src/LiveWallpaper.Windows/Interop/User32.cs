@@ -41,6 +41,7 @@ internal static unsafe partial class User32
     public const uint WM_DPICHANGED = 0x02E0;
     public const uint MB_OK = 0x0;
     public const uint MB_ICONWARNING = 0x30;
+    public const int VK_SPACE = 0x20;
 
     [LibraryImport("user32.dll", EntryPoint = "FindWindowW", StringMarshalling = StringMarshalling.Utf16)]
     public static partial nint FindWindow(string? className, string? windowName);
@@ -102,6 +103,13 @@ internal static unsafe partial class User32
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool ClientToScreen(nint hWnd, ref POINT point);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool ScreenToClient(nint hWnd, ref POINT point);
+
+    [LibraryImport("user32.dll")]
+    public static partial short GetKeyState(int virtualKey);
 
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
