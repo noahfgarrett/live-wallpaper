@@ -54,15 +54,22 @@ public sealed class RenderLoopTests
     {
         WindowsOnly.Require();
         using var loop = new RenderLoop();
-        _ = Task.Run(async () =>
+        // A dedicated thread: the thread pool is saturated by the GPU tests on CI.
+        var stopper = new Thread(() =>
         {
-            await Task.Delay(200);
+            Thread.Sleep(200);
             loop.Stop();
-        }, TestContext.Current.CancellationToken);
+        })
+        {
+            IsBackground = true,
+        };
+        stopper.Start();
 
         var watch = Stopwatch.StartNew();
         loop.Run(() => null);
+        var elapsed = watch.Elapsed;
+        stopper.Join();
 
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(5));
+        Assert.True(elapsed < TimeSpan.FromSeconds(5));
     }
 }
