@@ -245,15 +245,17 @@ Use a large photo with fine detail (leaves, fur, or text), and run these on the 
 
 23. **Sharp at Fit.** Open the photo in the editor, with the zoom at **Fit**. Apply it to the desktop and compare fine detail (leaves or text) in the preview with the same spot on the desktop.
     - Expected: the preview is sharp, with no blur or shimmering, and shows the same detail as the desktop, just smaller. Snow, rain, glass drops and water look the same size relative to the photo as on the desktop.
+    - Then resize the window so Fit is around 60–70 %, compare fine detail (text or leaves) again, and zoom slowly across 50 % with the wheel or the bar.
+    - Expected: at 60–70 % fine detail shows no shimmer, moiré or beat pattern. Sharpness doesn't jump when the zoom crosses 50 %.
     - Result:
 24. **Wheel zoom at the cursor.** Put the cursor on a small feature (a leaf, a letter) and roll the wheel up a few notches, then down.
-    - Expected: each notch zooms by about a quarter, and the feature under the cursor stays under it. Zooming out stops at Fit, and zooming in stops at 400 %. At 100 % the picture is pixel-exact: one screen pixel per desktop pixel, and finer detail than at Fit.
+    - Expected: each notch zooms by about a quarter, and the feature under the cursor stays under it. A notch that would cross 100 % stops at exactly 100 % (the bar reads "100 %"), and the next notch carries on. Zooming out stops at Fit, and zooming in stops at 400 %. At 100 % the picture is pixel-exact: one screen pixel per desktop pixel, and finer detail than at Fit.
     - Result:
 25. **Zoom bar.** Look at the bar under the preview at Fit, then click **+** until it stops, then **−** until it stops, then zoom in and click **Fit**.
     - Expected: the bar shows the zoom as a percentage of the desktop's size (for example "47 %"). At Fit, **−** and **Fit** are disabled. At the maximum, **+** is disabled. **Fit** returns to the fitted view.
     - Result:
-26. **Zoom shortcuts.** Click the preview, then press Ctrl+= and Ctrl+− a few times, then Ctrl+1, then Ctrl+0.
-    - Expected: Ctrl+= zooms in and Ctrl+− zooms out. Ctrl+1 shows 100 %, centred on the preview. Ctrl+0 returns to Fit. The percentage on the bar follows each.
+26. **Zoom shortcuts.** Open the editor and, without clicking anything, press Ctrl+= and Ctrl+− a few times, then Ctrl++ (Ctrl+Shift+=), then Ctrl+1, then Ctrl+0.
+    - Expected: the shortcuts work straight away, with no click first. Ctrl+= and Ctrl++ zoom in and Ctrl+− zooms out. Ctrl+1 shows 100 %, centred on the preview. Ctrl+0 returns to Fit. The percentage on the bar follows each.
     - Result:
 27. **Pan with the right and middle buttons.** Zoom in to 200 %. Drag the picture with the right button held, then with the middle button. Then add a region, and right-click one of its corners without moving the mouse.
     - Expected: both drags move the picture, and it can't be dragged past its edges. A right-click on a corner without a drag removes the corner (not below 3, and never on a glass pane), and does not move the picture. A right-drag that starts on a corner pans instead of removing it.
@@ -281,4 +283,6 @@ Use a large photo with fine detail (leaves, fur, or text), and run these on the 
     - Result:
 35. **GPU with the editor open.** Close the editor (go back to the library) and note the GPU of `LiveWallpaper.exe` and `LiveWallpaper.Engine` in Task Manager's **Processes** tab. Then open an image with snow, rain, glass and water on, leave the editor open for a minute at Fit, and note it again. Repeat at 400 %.
     - Expected: record the numbers. The preview renders at the size of your primary display, so the editor uses more GPU than the library, and more on a 4K display. The preview stays smooth, and the desktop engine doesn't slow down. GPU drops back when you return to the library.
+    - On a 4K screen, set **Soft edge** to 0 and drag a region corner around the preview for a few seconds.
+    - Expected: the drag follows the mouse with no hitching.
     - Result:
