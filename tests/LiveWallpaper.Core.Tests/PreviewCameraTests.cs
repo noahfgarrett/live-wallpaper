@@ -33,6 +33,22 @@ public sealed class PreviewCameraTests
     }
 
     [Fact]
+    public void CanZoomIn_IsFalseOnlyAtTheMaximum()
+    {
+        var fit = PreviewCamera.Fit(Render, View);
+        Assert.True(fit.CanZoomIn);
+        Assert.False(fit.ZoomAt(new PointF(480, 270), 100).CanZoomIn);
+    }
+
+    [Fact]
+    public void CanZoomOut_IsFalseOnlyAtFit()
+    {
+        var fit = PreviewCamera.Fit(Render, View);
+        Assert.False(fit.CanZoomOut);
+        Assert.True(fit.StepIn().CanZoomOut);
+    }
+
+    [Fact]
     public void ZoomAt_KeepsThePointUnderTheCursor()
     {
         var camera = PreviewCamera.Fit(Render, View);

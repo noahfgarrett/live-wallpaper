@@ -57,6 +57,8 @@ public sealed class PreviewHost : HwndHost
     private const int PanThreshold = 4;
 
     private PreviewChildWindow? _window;
+    private readonly HwndSourceHook _parentHook;
+    private HwndSource? _parent;
     private PreviewRenderer? _renderer;
     private (string Path, WallpaperScaling Scaling, System.Drawing.Size Reference)? _image;
     private SnowSettings _snow = new();
@@ -81,6 +83,11 @@ public sealed class PreviewHost : HwndHost
         LeftPan,
         RightPan,
         MiddlePan,
+    }
+
+    public PreviewHost()
+    {
+        _parentHook = OnParentMessage;
     }
 
     public event EventHandler<PreviewPointerEventArgs>? PointerInput;
@@ -146,6 +153,9 @@ public sealed class PreviewHost : HwndHost
         _renderer?.SetFrameRate(mode);
     }
 
+    /// <summary>Whether the mouse cursor is on the preview.</summary>
+    public bool IsUnderCursor() => _window?.IsUnderCursor() == true;
+
     public void SetCamera(PreviewCamera camera)
     {
         ArgumentNullException.ThrowIfNull(camera);
@@ -156,6 +166,8 @@ public sealed class PreviewHost : HwndHost
     protected override HandleRef BuildWindowCore(HandleRef hwndParent)
     {
         _window = PreviewChildWindow.Create(hwndParent.Handle, 1, 1);
+        _parent = HwndSource.FromHwnd(hwndParent.Handle);
+        _parent?.AddHook(_parentHook);
         _renderer = new PreviewRenderer(_window.Handle, new System.Drawing.Size(1, 1));
         _renderer.SetSnow(_snow);
         _renderer.SetRain(_rain);
@@ -180,6 +192,8 @@ public sealed class PreviewHost : HwndHost
 
     protected override void DestroyWindowCore(HandleRef hwnd)
     {
+        _parent?.RemoveHook(_parentHook);
+        _parent = null;
         _renderer?.Dispose();
         _renderer = null;
         _window?.Dispose();
@@ -283,6 +297,20 @@ public sealed class PreviewHost : HwndHost
         return base.WndProc(hwnd, msg, wParam, lParam, ref handled);
     }
 
+    /// <summary>
+    /// With Windows' "Scroll inactive windows" off, the wheel goes to the focused window instead of the preview under the
+    /// cursor. When the preview gets the wheel itself it handles it, so the parent never sees that one.
+    /// </summary>
+    private nint OnParentMessage(nint hwnd, int msg, nint wParam, nint lParam, ref bool handled)
+    {
+        if (msg == WM_MOUSEWHEEL && _window is not null && _window.IsUnder(ScreenPointOf(lParam)))
+        {
+            OnMouseWheel(wParam, lParam);
+            handled = true;
+        }
+        return 0;
+    }
+
     private void BeginDrag(Drag drag, RegionPoint position)
     {
         _window?.CaptureMouse();
@@ -322,15 +350,19 @@ public sealed class PreviewHost : HwndHost
         {
             return;
         }
-        // Unlike the other mouse messages, the wheel's position is in screen coordinates.
-        var value = (long)lParam;
-        var screen = new System.Drawing.Point((short)(value & 0xFFFF), (short)((value >> 16) & 0xFFFF));
-        if (_window.ScreenToClient(screen) is not { } client)
+        if (_window.ScreenToClient(ScreenPointOf(lParam)) is not { } client)
         {
             return;
         }
         var factor = Math.Pow(PreviewCamera.StepFactor, delta / (double)WheelNotch);
         ZoomRequested?.Invoke(this, new PreviewZoomEventArgs(new System.Drawing.PointF(client.X, client.Y), factor));
+    }
+
+    /// <summary>Unlike the other mouse messages, the wheel's position is in screen coordinates.</summary>
+    private static System.Drawing.Point ScreenPointOf(nint lParam)
+    {
+        var value = (long)lParam;
+        return new System.Drawing.Point((short)(value & 0xFFFF), (short)((value >> 16) & 0xFFFF));
     }
 
     private static RegionPoint PositionOf(nint lParam)

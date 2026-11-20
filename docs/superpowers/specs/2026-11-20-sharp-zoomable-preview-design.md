@@ -18,6 +18,7 @@ The user said: "the image preview within the app while you're modifying it can l
 
 - **Sharp at Fit:** the preview looks sharp at its normal size, using a proper downscale filter rather than a soft one.
 - **Zoom:** from Fit up to 400 %, where 100 % means one screen pixel per desktop pixel. Region corners and water arrows can be placed precisely at any zoom.
+  - Above 4K, 100 % means one screen pixel per pixel of the preview's render, because the preview renders at most 3840×2160 (see Render size).
 - **WYSIWYG:** the preview shows what the desktop will show, including effect sizes.
 
 Non-goals:
@@ -38,6 +39,7 @@ Non-goals:
 - R is the primary monitor's pixel size (`_monitorSize`), scaled down proportionally to fit within 3840×2160.
 - The scene, its masks and its frame copy are built for R, exactly as the engine builds them for a monitor.
 - The photo is decoded at the size it lands on R.
+- Above 4K, Center scaling still crops at the monitor's real size and then scales the result to R, so the preview shows what the desktop will. Up to 4K, R is the monitor, so this is the engine's own build.
 
 ### Camera (Core, `PreviewCamera`, pure and unit-tested)
 - **State:** `Scale` (view pixels per R pixel) and `Offset` (the R-pixel point at the view's top-left).

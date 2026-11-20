@@ -8,7 +8,8 @@
     xmlns:models="clr-namespace:LiveWallpaper.Core.Models;assembly=LiveWallpaper.Core"
     Focusable="True"
     FocusVisualStyle="{x:Null}"
-    PreviewKeyDown="OnPreviewKeyDown">
+    PreviewKeyDown="OnPreviewKeyDown"
+    PreviewKeyUp="OnPreviewKeyUp">
     <UserControl.Resources>
         <Style x:Key="EffectTabFocus">
             <Setter Property="Control.Template">
@@ -66,12 +67,10 @@
             <Setter Property="Fill" Value="{DynamicResource AccentFillColorDefaultBrush}" />
             <Setter Property="Visibility" Value="Collapsed" />
         </Style>
-        <!-- Not focusable, so Space held for panning never presses the zoom button last clicked. -->
         <Style x:Key="ZoomBarButton" BasedOn="{StaticResource {x:Type ui:Button}}" TargetType="ui:Button">
             <Setter Property="Appearance" Value="Transparent" />
             <Setter Property="Padding" Value="8,4" />
             <Setter Property="VerticalAlignment" Value="Stretch" />
-            <Setter Property="Focusable" Value="False" />
         </Style>
     </UserControl.Resources>
     <Grid>

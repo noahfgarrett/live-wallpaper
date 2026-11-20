@@ -39,6 +39,7 @@ public partial class EditorView : UserControl
     private EffectKind _activeTab = EffectKind.Snow;
     private bool _loading = true;
     private bool _syncingRegions;
+    private bool _isSpaceSwallowed;
 
     public EditorView(MainWindow window, EngineConnection engine, LibraryService library, LibraryItem item)
     {
@@ -75,12 +76,7 @@ public partial class EditorView : UserControl
         Preview.PointerInput += OnPreviewPointer;
         Preview.PixelSizeChanged += (_, _) => ShowCamera(_camera.Resize(Preview.PixelSize), force: true);
         Preview.ZoomRequested += (_, e) => ShowCamera(_camera.ZoomAt(e.ViewPoint, e.Factor));
-        Preview.PanRequested += (_, e) =>
-        {
-            // As a click on the preview does; it also keeps a Space held for panning from pressing a focused switch or button.
-            Focus();
-            ShowCamera(_camera.Pan(e.Delta));
-        };
+        Preview.PanRequested += (_, e) => ShowCamera(_camera.Pan(e.Delta));
         ApplyPanel.Closed += (_, _) =>
         {
             Overlay.Visibility = Visibility.Collapsed;
@@ -350,9 +346,9 @@ public partial class EditorView : UserControl
         _camera = camera;
         Preview.SetCamera(camera);
         ZoomText.Text = $"{camera.ZoomPercent} %";
-        ZoomOutButton.IsEnabled = !camera.IsFit;
-        ZoomInButton.IsEnabled = camera.Scale < Math.Max(PreviewCamera.MaxScale, camera.FitScale) - 1e-6;
-        FitButton.IsEnabled = !camera.IsFit;
+        ZoomOutButton.IsEnabled = camera.CanZoomOut;
+        ZoomInButton.IsEnabled = camera.CanZoomIn;
+        FitButton.IsEnabled = camera.CanZoomOut;
         UpdateRegionView();
     }
 
@@ -369,7 +365,7 @@ public partial class EditorView : UserControl
         if (pixels.Width >= 2 && pixels.Height >= 2 && _item.PixelWidth > 0 && _item.PixelHeight > 0)
         {
             // Where the whole image lands on the desktop-sized scene, then where the camera shows that.
-            var imageBoundsOnRender = ScalingMath.ComputeDestination(new System.Drawing.Size(_item.PixelWidth, _item.PixelHeight), _renderSize, SelectedScaling());
+            var imageBoundsOnRender = ScalingMath.ComputeScaledDestination(new System.Drawing.Size(_item.PixelWidth, _item.PixelHeight), _monitorSize, _renderSize, SelectedScaling());
             view = new RegionView(_camera.MapRect(imageBoundsOnRender), pixels, DpiScale);
         }
         foreach (var editor in _editors.Values)
@@ -508,6 +504,15 @@ public partial class EditorView : UserControl
         {
             return;
         }
+        if (e.Key == Key.Space && Preview.IsUnderCursor())
+        {
+            // Space over the preview is for panning. A focused switch or button would otherwise take it, capture the
+            // mouse so the preview never sees the drag, and click when Space comes up.
+            Focus();
+            _isSpaceSwallowed = true;
+            e.Handled = true;
+            return;
+        }
         var modifiers = Keyboard.Modifiers;
         if (e.Key is Key.Delete or Key.Back && modifiers == ModifierKeys.None)
         {
@@ -526,6 +531,15 @@ public partial class EditorView : UserControl
         else if (modifiers == ModifierKeys.Control && ZoomFor(e.Key) is { } zoom)
         {
             ShowCamera(zoom);
+            e.Handled = true;
+        }
+    }
+
+    private void OnPreviewKeyUp(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Space && _isSpaceSwallowed)
+        {
+            _isSpaceSwallowed = false;
             e.Handled = true;
         }
     }

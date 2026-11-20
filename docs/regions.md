@@ -96,7 +96,7 @@ The preview is a Win32 child window in an `HwndHost`, and WPF can't draw over it
 
 The app draws them in the renderer (`RegionOverlayRenderer`) and reads the mouse from the child window's messages (`PreviewHost.WndProc`), because:
 
-- **It always lines up.** The renderer draws the handles with the same image rectangle it uses for the photo and the snow, so they stay pixel-aligned at any DPI. While the window is being resized, the preview rebuilds its scene only once the size settles, so for that moment clicks can land slightly off the drawn handles.
+- **It always lines up.** The renderer draws the handles with the same image rectangle it uses for the photo and the snow, so they stay pixel-aligned at any DPI. The scene is drawn at the desktop's resolution and doesn't depend on the preview's size, so resizing the window only resizes the swap chain, and the handles stay aligned throughout.
 - **There's no second window to keep in sync.** A layered window would have to follow every move, resize, minimize, DPI change and virtual-desktop switch, hide when the Apply panel hides the preview, and it would visibly lag behind while the main window moves.
 
 The cost is a small SDF shader for lines and circles, and mouse capture through `SetCapture`.

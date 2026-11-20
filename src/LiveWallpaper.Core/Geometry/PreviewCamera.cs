@@ -21,6 +21,10 @@ public sealed record PreviewCamera(Size Render, Size View, double Scale, PointF 
 
     public bool IsFit => Math.Abs(Scale - FitScale) < FitTolerance;
 
+    public bool CanZoomIn => Scale < MaxFor(FitScale) - FitTolerance;
+
+    public bool CanZoomOut => !IsFit;
+
     public int ZoomPercent => (int)Math.Round(Scale * 100, MidpointRounding.AwayFromZero);
 
     public static PreviewCamera Fit(Size render, Size view)

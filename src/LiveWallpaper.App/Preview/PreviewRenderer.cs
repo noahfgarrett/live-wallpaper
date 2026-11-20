@@ -54,7 +54,7 @@ public sealed class PreviewRenderer : IDisposable
 
     /// <param name="path">The image file.</param>
     /// <param name="scaling">How it is scaled.</param>
-    /// <param name="reference">The monitor the preview stands for. The scene is built at its resolution (<see cref="PreviewCamera.RenderSizeFor"/>), as the desktop builds it.</param>
+    /// <param name="reference">The monitor the preview stands for. The scene is built at its resolution, capped at 4K (<see cref="PreviewCamera.RenderSizeFor"/>); Center scaling crops at the monitor's size, so the preview shows what the desktop will.</param>
     public void SetImage(string path, WallpaperScaling scaling, Size reference)
     {
         lock (_gate)
@@ -165,7 +165,7 @@ public sealed class PreviewRenderer : IDisposable
                         render = PreviewCamera.RenderSizeFor(wanted.Reference);
                         try
                         {
-                            (scene, effects) = BuildScene(gpu, background, wanted.Path, wanted.Scaling, render);
+                            (scene, effects) = BuildScene(gpu, background, wanted.Path, wanted.Scaling, wanted.Reference, render);
                         }
                         catch (Exception ex) when (ex is not OutOfMemoryException)
                         {
@@ -234,15 +234,22 @@ public sealed class PreviewRenderer : IDisposable
         return requested.View == view ? requested : requested.Resize(view);
     }
 
-    /// <summary>Builds the scene for a monitor of <paramref name="render"/> pixels, exactly as the engine builds it.</summary>
-    private static (WallpaperScene Scene, SceneEffects Effects) BuildScene(GpuDevice gpu, ImageQuadRenderer background, string path, WallpaperScaling scaling, Size render)
+    /// <summary>
+    /// Builds the scene as the reference monitor shows it, scaled to <paramref name="render"/> pixels. That is the
+    /// monitor itself up to 4K, where this is exactly what the engine builds.
+    /// </summary>
+    private static (WallpaperScene Scene, SceneEffects Effects) BuildScene(GpuDevice gpu, ImageQuadRenderer background, string path, WallpaperScaling scaling, Size reference, Size render)
     {
         var imageSize = WicImageLoader.ReadSize(path);
-        var crop = ScalingMath.ComputeSourceCrop(imageSize, render, scaling);
-        var decoded = WicImageLoader.Load(path, crop, ScalingMath.ComputeDecodeSize(imageSize, render, scaling));
+        var crop = ScalingMath.ComputeSourceCrop(imageSize, reference, scaling);
+        var onReference = ScalingMath.ComputeDecodeSize(imageSize, reference, scaling);
+        var decodeSize = new Size(
+            Math.Clamp((int)Math.Ceiling(onReference.Width * (double)render.Width / reference.Width), 1, crop.Width),
+            Math.Clamp((int)Math.Ceiling(onReference.Height * (double)render.Height / reference.Height), 1, crop.Height));
+        var decoded = WicImageLoader.Load(path, crop, decodeSize);
         var scene = new WallpaperScene(gpu, background, gpu.CreateImageTexture(decoded),
-            ScalingMath.ComputeDestination(crop.Size, render, scaling),
-            ScalingMath.ComputeDestination(imageSize, render, scaling));
+            ScalingMath.ComputeScaledDestination(crop.Size, reference, render, scaling),
+            ScalingMath.ComputeScaledDestination(imageSize, reference, render, scaling));
         try
         {
             var snow = new SnowEffect(gpu, Seed);

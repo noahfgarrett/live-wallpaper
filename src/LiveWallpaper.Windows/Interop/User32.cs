@@ -112,6 +112,9 @@ internal static unsafe partial class User32
     public static partial short GetKeyState(int virtualKey);
 
     [LibraryImport("user32.dll")]
+    public static partial nint WindowFromPoint(POINT point);
+
+    [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool ShowWindow(nint hWnd, int cmdShow);
 
